@@ -9,6 +9,10 @@
 #include <limits>
 #include <numeric>
 
+#ifdef KOKKOS_ENABLE_CUDA
+#include <cuda_runtime.h>
+#endif
+
 // Define the execution and memory spaces
 using exec_space = Kokkos::DefaultExecutionSpace;
 using mem_space = typename exec_space::memory_space;
@@ -38,43 +42,7 @@ struct SearchSpaceBounds {
         : lowerBounds(lBounds), upperBounds(uBounds), dimension(n) {}
 };
 
-// Compute a single term of the Shubert function
-KOKKOS_INLINE_FUNCTION
-double computeShubertTerm(double x, int i) {
-    return i * sin((i + 1) * x + i);
-}
-
-// Compute the objective function using a Kokkos::View
-template<typename ViewType>
-KOKKOS_INLINE_FUNCTION
-double objectiveFunction(const ViewType& pointView) {
-    double result = 1.0;
-    const int dimension = pointView.extent(0);
-
-    for (int d = 0; d < dimension; ++d) {
-        double x = pointView(d);
-        double term = 0.0;
-        for (int i = 1; i <= 5; ++i) {
-            term += computeShubertTerm(x, i);
-        }
-        result *= term;
-    }
-
-    return result;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-// Helper function for Sphere
+// Helper function for Sphere function
 KOKKOS_INLINE_FUNCTION
 double computeSphereTerm(double x) {
     return x * x;
@@ -95,113 +63,6 @@ double sphereObjectiveFunction(const ViewType& pointView) {
     return result;
 }
 
-// ------------------------------
-// 2. Rastrigin Function (Multimodal)
-// ------------------------------
-
-// Helper function for Rastrigin
-KOKKOS_INLINE_FUNCTION
-double computeRastriginTerm(double x, int /*i*/) {
-    return x * x - 10.0 * cos(2.0 * M_PI * x);
-}
-
-// Objective function for Rastrigin
-template<typename ViewType>
-KOKKOS_INLINE_FUNCTION
-double rastriginObjectiveFunction(const ViewType& pointView) {
-    double result = 10.0 * pointView.extent(0); // 10 * dimension
-    const int dimension = pointView.extent(0);
-
-    for(int d = 0; d < dimension; ++d){
-        double x = pointView(d);
-        result += computeRastriginTerm(x, d);
-    }
-
-    return result;
-}
-
-// ------------------------------
-// 3. Schwefel Function (Multimodal with Many Local Minima)
-// ------------------------------
-
-// Helper function for Schwefel
-KOKKOS_INLINE_FUNCTION
-double computeSchwefelTerm(double x, int /*i*/) {
-    return -x * sin(sqrt(std::abs(x)));
-}
-
-// Objective function for Schwefel
-template<typename ViewType>
-KOKKOS_INLINE_FUNCTION
-double schwefelObjectiveFunction(const ViewType& pointView) {
-    double result = 0.0;
-    const int dimension = pointView.extent(0);
-
-    for(int d = 0; d < dimension; ++d){
-        double x = pointView(d);
-        result += computeSchwefelTerm(x, d);
-    }
-
-    return result;
-}
-
-// ------------------------------
-// 4. Ellipsoidal Function (Separable, Scalable)
-// ------------------------------
-
-// Helper function for Ellipsoidal
-KOKKOS_INLINE_FUNCTION
-double computeEllipsoidalTerm(double x, int i) {
-    return std::pow(10.0, static_cast<double>(i)) * x * x;
-}
-
-// Objective function for Ellipsoidal
-template<typename ViewType>
-KOKKOS_INLINE_FUNCTION
-double ellipsoidalObjectiveFunction(const ViewType& pointView) {
-    double result = 0.0;
-    const int dimension = pointView.extent(0);
-
-    for(int d = 0; d < dimension; ++d){
-        double x = pointView(d);
-        result += computeEllipsoidalTerm(x, d + 1); // i starts from 1
-    }
-
-    return result;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Structure to hold a hypersphere and its score
-struct HypersphereScore {
-    Hypersphere hs;
-    double score;
-
-    HypersphereScore() = default;
-
-    HypersphereScore(const Hypersphere& h, double sc)
-        : hs(h), score(sc) {}
-};
-
-
-
-
-
 // Serialize HypersphereID into a vector of integers
 std::vector<int> serializeHypersphereID(const HypersphereID& id) {
     std::vector<int> serialized;
@@ -212,11 +73,6 @@ std::vector<int> serializeHypersphereID(const HypersphereID& id) {
     }
     return serialized;
 }
-
-
-
-
-
 
 // Deserialize vector of integers into HypersphereID
 HypersphereID deserializeHypersphereID(const std::vector<int>& data, size_t& offset) {
@@ -230,13 +86,39 @@ HypersphereID deserializeHypersphereID(const std::vector<int>& data, size_t& off
     return id;
 }
 
+// Reconstruct the center of a hypersphere
+Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>
+reconstructCenter(const Hypersphere& hs,
+                  const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initialCenter,
+                  double initialRadius) {
+    int dimension = hs.dimension;
+    int depth = hs.depth;
 
+    // Reconstruct center in host memory
+    Kokkos::View<double*, Kokkos::LayoutLeft, Kokkos::HostSpace> centerHost("centerHost", dimension);
 
+    // Copy initialCenter to centerHost
+    auto initialCenterHost = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), initialCenter);
+    Kokkos::deep_copy(centerHost, initialCenterHost);
 
+    double r = initialRadius;
+    for (int d = 0; d < depth; ++d) {
+        double sqrt2 = sqrt(2.0);
+        double r_prime = r / (1.0 + sqrt2);
+        double offset = r - r_prime;
+        int dim = hs.id[d].first;
+        int sign = hs.id[d].second;
 
+        centerHost(dim) += sign * offset;
+        r = r_prime; // Update radius for next level
+    }
 
+    // Now, create device copy of centerHost
+    Kokkos::View<double*, Kokkos::LayoutLeft, mem_space> center("center", dimension);
+    Kokkos::deep_copy(center, centerHost);
 
-
+    return center;
+}
 
 // Generate random points around the center of a hypersphere
 Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
@@ -282,96 +164,175 @@ generateRandomPointsAroundCenter(const Kokkos::View<double*, Kokkos::LayoutLeft,
     return points;
 }
 
+// Function to flatten HypersphereIDs and prepare data for device processing
+void prepareHypersphereData(
+    const std::vector<Hypersphere>& hyperspheres,
+    Kokkos::View<int*, mem_space>& depths,
+    Kokkos::View<size_t*, mem_space>& idOffsets,
+    Kokkos::View<int*, mem_space>& idDims,
+    Kokkos::View<int*, mem_space>& idSigns) {
 
+    size_t numHyperspheres = hyperspheres.size();
 
+    // Allocate device views
+    depths = Kokkos::View<int*, mem_space>("depths", numHyperspheres);
+    idOffsets = Kokkos::View<size_t*, mem_space>("idOffsets", numHyperspheres + 1);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Score a hypersphere using the Sphere objective by computing the average objective value of sampled points
-double scoreHypersphere(const Hypersphere& hs,
-                               const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initialCenter,
-                               double initialRadius) {
-    // Reconstruct center in host memory
-    Kokkos::View<double*, Kokkos::LayoutLeft, Kokkos::HostSpace> centerHost("centerHost", hs.dimension);
-
-    // Copy initialCenter to centerHost
-    auto initialCenterHost = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), initialCenter);
-    Kokkos::deep_copy(centerHost, initialCenterHost);
-
-    double r = initialRadius;
-    for (int d = 0; d < hs.depth; ++d) {
-        double sqrt2 = sqrt(2.0);
-        double r_prime = r / (1.0 + sqrt2);
-        double offset = r - r_prime;
-        int dim = hs.id[d].first;
-        int sign = hs.id[d].second;
-
-        centerHost(dim) += sign * offset;
-        r = r_prime; // Update radius for next level
+    // Calculate total size for flattened IDs
+    size_t totalIDSize = 0;
+    for (const auto& hs : hyperspheres) {
+        totalIDSize += hs.id.size();
     }
 
-    // Now, create device copy of centerHost
-    Kokkos::View<double*, Kokkos::LayoutLeft, mem_space> center("center", hs.dimension);
-    Kokkos::deep_copy(center, centerHost);
+    idDims = Kokkos::View<int*, mem_space>("idDims", totalIDSize);
+    idSigns = Kokkos::View<int*, mem_space>("idSigns", totalIDSize);
 
-    // Generate points around the center
-    auto points = generateRandomPointsAroundCenter(center, r, hs.dimension);
+    // Host mirrors for data preparation
+    auto depthsHost = Kokkos::create_mirror_view(depths);
+    auto idOffsetsHost = Kokkos::create_mirror_view(idOffsets);
+    auto idDimsHost = Kokkos::create_mirror_view(idDims);
+    auto idSignsHost = Kokkos::create_mirror_view(idSigns);
 
-    double totalScore = 0.0;
+    // Flatten the IDs and fill depths and offsets
+    size_t currentOffset = 0;
+    for (size_t i = 0; i < numHyperspheres; ++i) {
+        depthsHost(i) = hyperspheres[i].depth;
+        idOffsetsHost(i) = currentOffset;
+        for (const auto& pair : hyperspheres[i].id) {
+            idDimsHost(currentOffset) = pair.first;
+            idSignsHost(currentOffset) = pair.second;
+            currentOffset++;
+        }
+    }
+    idOffsetsHost(numHyperspheres) = currentOffset;
 
-    auto team_policy = Kokkos::TeamPolicy<>(points.extent(0), Kokkos::AUTO); // Number of points, AUTO threads per team
-
-    Kokkos::parallel_reduce(
-        "ComputeScoreSphere",
-        team_policy,
-        KOKKOS_LAMBDA(const Kokkos::TeamPolicy<>::member_type& team, double& teamSum) {
-            int i = team.league_rank(); // Each team works on one point
-
-            // Compute the Sphere objective value
-            double objValue = sphereObjectiveFunction(Kokkos::subview(points, i, Kokkos::ALL()));
-
-            // Team-wide reduction
-            Kokkos::single(Kokkos::PerTeam(team), [&]() {
-                teamSum += objValue;
-            });
-        }, totalScore);
-
-    // Compute the arithmetic mean
-    return totalScore / static_cast<double>(points.extent(0));
+    // Copy data to device
+    Kokkos::deep_copy(depths, depthsHost);
+    Kokkos::deep_copy(idOffsets, idOffsetsHost);
+    Kokkos::deep_copy(idDims, idDimsHost);
+    Kokkos::deep_copy(idSigns, idSignsHost);
 }
 
+// Function to reconstruct centers and radii for all hyperspheres
+void reconstructCentersAndRadii(
+    size_t numHyperspheres,
+    int dimension,
+    double initialRadius,
+    const Kokkos::View<int*, mem_space>& depths,
+    const Kokkos::View<size_t*, mem_space>& idOffsets,
+    const Kokkos::View<int*, mem_space>& idDims,
+    const Kokkos::View<int*, mem_space>& idSigns,
+    const Kokkos::View<double*, mem_space>& initialCenterDevice,
+    Kokkos::View<double**, mem_space>& centers,
+    Kokkos::View<double*, mem_space>& radii) {
 
+    // Allocate centers and radii
+    centers = Kokkos::View<double**, mem_space>("centers", numHyperspheres, dimension);
+    radii = Kokkos::View<double*, mem_space>("radii", numHyperspheres);
 
+    Kokkos::parallel_for("ReconstructCenters", Kokkos::RangePolicy<>(0, numHyperspheres), KOKKOS_LAMBDA(int i) {
+        int depth = depths(i);
+        size_t idStart = idOffsets(i);
 
+        // Copy initialCenter to centers
+        for (int j = 0; j < dimension; ++j) {
+            centers(i, j) = initialCenterDevice(j);
+        }
 
+        double r = initialRadius;
+        for (int d = 0; d < depth; ++d) {
+            double sqrt2 = sqrt(2.0);
+            double r_prime = r / (1.0 + sqrt2);
+            double offset = r - r_prime;
 
+            int dim = idDims(idStart + d);
+            int sign = idSigns(idStart + d);
 
+            centers(i, dim) += sign * offset;
+            r = r_prime; // Update radius for next level
+        }
+        radii(i) = r;
+    });
+}
 
+// Function to score all hyperspheres using hierarchical parallelism without shared memory
+void scoreHyperspheres(
+    size_t numHyperspheres,
+    int dimension,
+    const Kokkos::View<double**, mem_space>& centers,
+    const Kokkos::View<double*, mem_space>& radii,
+    const Kokkos::View<double*, mem_space>& bestSolutionDevice,
+    double bestObjectiveValue,
+    Kokkos::View<double*, mem_space>& kokkosScores) {
 
+    // Initialize kokkosScores to zero
+    Kokkos::deep_copy(kokkosScores, 0.0);
 
+    // Number of points per hypersphere
+    const int numPoints = 3;
 
+    // Define team policy
+    using team_policy = Kokkos::TeamPolicy<>;
+    using member_type = team_policy::member_type;
 
+    // Parallel loop over hyperspheres
+    Kokkos::parallel_for("ScoreHyperspheres", team_policy(numHyperspheres, Kokkos::AUTO), KOKKOS_LAMBDA(const member_type& team) {
+        const int i = team.league_rank(); // Each team works on one hypersphere
 
+        double totalScore = 0.0;
+        double r = radii(i);
 
+        // Loop over the number of points
+        for (int p = 0; p < numPoints; ++p) {
 
+            // Since all points are initialized with 0.5, we can compute norm directly
+            double norm = sqrt(dimension * 0.5 * 0.5);
+
+            // Variables to accumulate fx and distance
+            double fx = 0.0;
+            double distance = 0.0;
+
+            // Parallel reduction over dimensions for fx
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team, dimension),
+                [=](const int d, double& fx_local) {
+                    double val = 0.5;
+                    double point_d = centers(i, d) + (val / norm) * r;
+
+                    // Objective function calculation (fx)
+                    fx_local += computeSphereTerm(point_d);
+                }, fx);
+
+            // Parallel reduction over dimensions for distance
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team, dimension),
+                [=](const int d, double& distance_local) {
+                    double val = 0.5;
+                    double point_d = centers(i, d) + (val / norm) * r;
+
+                    // Distance calculation
+                    double diff = point_d - bestSolutionDevice(d);
+                    distance_local += diff * diff;
+                }, distance);
+
+            distance = sqrt(distance);
+
+            // Avoid division by zero
+            if (distance == 0.0) {
+                distance = 1e-10;
+            }
+
+            double c_dttb = (fx - bestObjectiveValue) / distance;
+
+            totalScore += c_dttb;
+
+            // Optional: team.team_barrier(); // Not strictly necessary here
+        }
+
+        // Compute mean score
+        kokkosScores(i) = totalScore / numPoints;
+    });
+}
 
 // Compute the objective value of the solution using parallel_reduce
 double computeObjectiveValue(const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& solution) {
@@ -386,52 +347,16 @@ double computeObjectiveValue(const Kokkos::View<double*, Kokkos::LayoutLeft, mem
     return objValue;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Function to perform intensive local search
 Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>
 intensiveLocalSearch(const Hypersphere& hs,
-                            const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initialCenter,
-                            double initialRadius,
-                            int maxIterations, double stepSize,
-                            double phi, double omega_min) {
+                     const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initialCenter,
+                     double initialRadius,
+                     int maxIterations, double stepSize,
+                     double phi, double omega_min) {
 
-    // Reconstruct center in host memory
-    Kokkos::View<double*, Kokkos::LayoutLeft, Kokkos::HostSpace> centerHost("centerHost", hs.dimension);
-
-    // Copy initialCenter to centerHost
-    auto initialCenterHost = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), initialCenter);
-    Kokkos::deep_copy(centerHost, initialCenterHost);
-
-    double r = initialRadius;
-    for (int d = 0; d < hs.depth; ++d) {
-        double sqrt2 = sqrt(2.0);
-        double r_prime = r / (1.0 + sqrt2);
-        double offset = r - r_prime;
-        int dim = hs.id[d].first;
-        int sign = hs.id[d].second;
-
-        centerHost(dim) += sign * offset;
-        r = r_prime; // Update radius for next level
-    }
-
-    // Now, create device copy of centerHost
-    Kokkos::View<double*, Kokkos::LayoutLeft, mem_space> center("center", hs.dimension);
-    Kokkos::deep_copy(center, centerHost);
+    // Reconstruct center
+    auto center = reconstructCenter(hs, initialCenter, initialRadius);
 
     Kokkos::View<double*, Kokkos::LayoutLeft, mem_space> bestSolution("bestSolution", hs.dimension);
     Kokkos::deep_copy(bestSolution, center);
@@ -487,7 +412,7 @@ intensiveLocalSearch(const Hypersphere& hs,
                     double neighborValue1 = computeSphereTerm(xs1);
                     double neighborValue2 = computeSphereTerm(xs2);
 
-                    double localBestValue = bestValue;
+                    double localBestValue = term_d(dim);
                     double newTerm = term_d(dim);
                     double new_x = localBestPoint(dim);
 
@@ -549,27 +474,6 @@ intensiveLocalSearch(const Hypersphere& hs,
     return bestSolution;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Decompose a hypersphere into child hyperspheres
 std::vector<Hypersphere> decomposeHypersphere(const Hypersphere& parentHs) {
     std::vector<Hypersphere> childHyperspheres;
@@ -588,18 +492,6 @@ std::vector<Hypersphere> decomposeHypersphere(const Hypersphere& parentHs) {
     return childHyperspheres;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 // Function to select the indices of the best 'beta' scores
 std::vector<int> selectBestIndices(const std::vector<double>& scores, int beta) {
     std::vector<int> indices(scores.size());
@@ -617,26 +509,63 @@ std::vector<int> selectBestIndices(const std::vector<double>& scores, int beta) 
 
 
 
+// Function to get available GPU memory
+size_t get_available_memory() {
+    size_t free_mem = 0;
+    size_t total_mem = 0;
+#ifdef KOKKOS_ENABLE_CUDA
+    cudaMemGetInfo(&free_mem, &total_mem);
+#else
+    // For other backends, set free_mem to a large value or a default
+    free_mem = SIZE_MAX;
+#endif
+    return free_mem;
+}
 
 
 
 
+// Function to parse command-line arguments for beta (beam width)
+int parseBeta(int argc, char* argv[], int world_rank) {
+    int beta = 50; // Default value
+    if (argc > 1) {
+        try {
+            beta = std::stoi(argv[1]);
+            if (beta <= 0) {
+                if (world_rank == 0) {
+                    std::cerr << "Beam width (beta) must be a positive integer. Using default value 50.\n";
+                }
+                beta = 50;
+            }
+        } catch (const std::invalid_argument& e) {
+            if (world_rank == 0) {
+                std::cerr << "Invalid beam width (beta) argument. Using default value 50.\n";
+            }
+        } catch (const std::out_of_range& e) {
+            if (world_rank == 0) {
+                std::cerr << "Beam width (beta) argument out of range. Using default value 50.\n";
+            }
+        }
+    }
+    return beta;
+}
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+// Add a function to parse command-line arguments for dimension
+int parseDimension(int argc, char* argv[], int world_rank) {
+    int dimension = 20000; // Default value
+    if (argc > 2) {
+        try {
+            dimension = std::stoi(argv[2]);
+        } catch (const std::invalid_argument& e) {
+            if (world_rank == 0) {
+                std::cerr << "Invalid dimension argument. Using default value 20000.\n";
+            }
+        }
+    }
+    return dimension;
+}
 
 int main(int argc, char* argv[]) {
     // Initialize MPI
@@ -676,28 +605,31 @@ int main(int argc, char* argv[]) {
     MPI_Bcast(&num_nodes, 1, MPI_INT, 0, node_comm);
     MPI_Bcast(&node_id, 1, MPI_INT, 0, node_comm);
 
+    // Parse beam_width (beta) and dimension from command-line arguments
+    const int beta = parseBeta(argc, argv, world_rank);
+    int dimension = parseDimension(argc, argv, world_rank);
+
+
     // Initialize Kokkos
     Kokkos::initialize(argc, argv);
     {
         auto start = std::chrono::high_resolution_clock::now();
 
         // Define parameters for the search
-        int dimension = 5000; // Changed to non-const to avoid issues with MPI_Bcast if needed
-        const int beta = 5;
         const int maxDepth = 5;
         // Parameters for applying the intensive local search starting from the center
         int maxIterations = 100;   // Number of iterations for the search
-        double stepSize = 2.0;     // Initial step size (ω)
-        double phi = 1.2;          // Factor to reduce step size
-        double omega_min = 0.001;  // Minimum step size before stopping
+        double stepSize = 1.75;     // Initial step size (ω)
+        double phi = 0.5;          // Factor to reduce step size
+        double omega_min = 1e-20;  // Minimum step size before stopping
 
         // Initialize the search space
         Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>
             lowerBounds("lowerBounds", dimension);
         Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>
             upperBounds("upperBounds", dimension);
-        Kokkos::deep_copy(lowerBounds, -10.0); // Example bounds
-        Kokkos::deep_copy(upperBounds, 10.0);
+        Kokkos::deep_copy(lowerBounds, -5.12); // Example bounds
+        Kokkos::deep_copy(upperBounds, 5.12);
         SearchSpaceBounds searchSpace(dimension, lowerBounds, upperBounds);
 
         // Seed for random number generation (unique per rank)
@@ -709,11 +641,16 @@ int main(int argc, char* argv[]) {
             initialCenter("initialCenter", dimension);
         Kokkos::parallel_for("ComputeInitialCenter", Kokkos::RangePolicy<exec_space>(0, dimension),
             KOKKOS_LAMBDA(const int j) {
-                initialCenter(j) = -10.0 + (10.0 - (-10.0)) / 2.0; // Center at 0.0
+                initialCenter(j) = -5.12 + (5.12 - (-5.12)) / 2.0; // Center at 0.0
             });
 
         // Compute radius: r = (U_j - L_j) / 2
-        double initialRadius = 10.0; // Since upperBounds - lowerBounds = 20, r = 10
+        double initialRadius = 5.12; // Since upperBounds - lowerBounds = 10.24, r = 5.12
+
+        // Initialize best solution and objective value
+        double bestObjectiveValue = std::numeric_limits<double>::max();
+        Kokkos::View<double*, Kokkos::LayoutLeft, mem_space> bestSolution("bestSolution", dimension);
+        Kokkos::deep_copy(bestSolution, initialCenter);
 
         // Create the initial hypersphere
         HypersphereID initialID;
@@ -746,160 +683,313 @@ int main(int argc, char* argv[]) {
             int localEndIdx = localStartIdx + numPerRank + (node_rank < remainder_local ? 1 : 0);
             int numLocalHyperspheres = localEndIdx - localStartIdx;
 
-            // Initialize a vector to store local scores and IDs
-            std::vector<double> localScoresOnly(numLocalHyperspheres);
+            // Initialize a vector to store local hyperspheres
+            std::vector<Hypersphere> myHyperspheres;
+            for (int i = localStartIdx; i < localEndIdx; ++i) {
+                myHyperspheres.push_back(currentHyperspheres[i]);
+            }
+
+            // **Modified Code Starts Here**
+
+            // Get available GPU memory
+            size_t available_memory = get_available_memory();
+
+            // Estimate per-hypersphere memory usage
+            size_t per_hypersphere_memory = (dimension + 2) * sizeof(double);
+
+            // Calculate max number of hyperspheres per chunk
+            size_t max_num_hyperspheres = static_cast<size_t>(available_memory * 0.9) / per_hypersphere_memory;
+            if (max_num_hyperspheres == 0) {
+                max_num_hyperspheres = 1;
+            }
+
+            // Prepare to collect scores from all chunks
+            std::vector<double> localScoresOnly;
+            std::vector<Hypersphere> localHyperspheres;
+
+            size_t totalHyperspheres = numLocalHyperspheres;
+
+            for (size_t chunk_start = 0; chunk_start < totalHyperspheres; chunk_start += max_num_hyperspheres) {
+                size_t chunk_size = std::min(max_num_hyperspheres, totalHyperspheres - chunk_start);
+
+                // Get the hyperspheres for this chunk
+                std::vector<Hypersphere> chunkHyperspheres(myHyperspheres.begin() + chunk_start, myHyperspheres.begin() + chunk_start + chunk_size);
+
+                // Prepare hypersphere data
+                Kokkos::View<int*, mem_space> depths_chunk;
+                Kokkos::View<size_t*, mem_space> idOffsets_chunk;
+                Kokkos::View<int*, mem_space> idDims_chunk;
+                Kokkos::View<int*, mem_space> idSigns_chunk;
+
+                prepareHypersphereData(chunkHyperspheres, depths_chunk, idOffsets_chunk, idDims_chunk, idSigns_chunk);
+
+                // Reconstruct centers and radii
+                Kokkos::View<double**, mem_space> centers_chunk;
+                Kokkos::View<double*, mem_space> radii_chunk;
+
+                reconstructCentersAndRadii(
+                    chunk_size,
+                    dimension,
+                    initialRadius,
+                    depths_chunk,
+                    idOffsets_chunk,
+                    idDims_chunk,
+                    idSigns_chunk,
+                    initialCenter,
+                    centers_chunk,
+                    radii_chunk);
+
+                // Allocate scores view
+                Kokkos::View<double*, mem_space> kokkosScores_chunk("scores", chunk_size);
+
+                // Score hyperspheres in parallel
+                scoreHyperspheres(
+                    chunk_size,
+                    dimension,
+                    centers_chunk,
+                    radii_chunk,
+                    bestSolution,
+                    bestObjectiveValue,
+                    kokkosScores_chunk);
+
+                // Copy scores back to host and process
+                auto scoresHost_chunk = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), kokkosScores_chunk);
+
+                // Collect scores and hyperspheres from the chunk
+                for (size_t i = 0; i < chunk_size; ++i) {
+                    localScoresOnly.push_back(scoresHost_chunk(i));
+                    localHyperspheres.push_back(chunkHyperspheres[i]);
+                }
+            }
+
+            // **Modified Code Ends Here**
+
+            // Local selection of top 'beta' hyperspheres
+            int localBeta = std::min(beta, static_cast<int>(localScoresOnly.size()));
+            std::vector<int> localSelectedIndices = selectBestIndices(localScoresOnly, localBeta);
+
+            std::vector<double> localTopScores(localBeta);
+            std::vector<HypersphereID> localTopIDs(localBeta);
+            for (int i = 0; i < localBeta; ++i) {
+                int idx = localSelectedIndices[i];
+                localTopScores[i] = localScoresOnly[idx];
+                localTopIDs[i] = localHyperspheres[idx].id;
+            }
+
+            // Now, gather the top 'beta' hyperspheres within the node
+            // Prepare data for MPI communication
+            int localDataSize = localBeta;
+            std::vector<int> allDataSizes(node_size);
+            MPI_Allgather(&localDataSize, 1, MPI_INT, allDataSizes.data(), 1, MPI_INT, node_comm);
+
+            int totalDataSize = std::accumulate(allDataSizes.begin(), allDataSizes.end(), 0);
+
+            // Prepare displacements
+            std::vector<int> displs(node_size, 0);
+            for (int i = 1; i < node_size; ++i) {
+                displs[i] = displs[i - 1] + allDataSizes[i - 1];
+            }
+
+            // Gather scores
+            std::vector<double> allScores(totalDataSize);
+            MPI_Allgatherv(localTopScores.data(), localDataSize, MPI_DOUBLE,
+                           allScores.data(), allDataSizes.data(), displs.data(), MPI_DOUBLE, node_comm);
+
+            // Serialize localTopIDs
             std::vector<int> localIDsSerialized;
-
-            // Process assigned hyperspheres
-            for (int i = 0; i < numLocalHyperspheres; ++i) {
-                int idx = localStartIdx + i;
-                double score = scoreHypersphere(currentHyperspheres[idx], initialCenter, initialRadius);
-                localScoresOnly[i] = score;
-
-                auto serializedID = serializeHypersphereID(currentHyperspheres[idx].id);
+            for (const auto& id : localTopIDs) {
+                auto serializedID = serializeHypersphereID(id);
                 localIDsSerialized.insert(localIDsSerialized.end(), serializedID.begin(), serializedID.end());
             }
 
-            // Intra-node communication to gather scores and IDs
-            // Communicate sizes within the node
+            // Gather sizes of serialized IDs
             int localIDSize = localIDsSerialized.size();
-            std::vector<int> allNumHyperspheres(node_size);
             std::vector<int> allIDSizes(node_size);
-            MPI_Allgather(&numLocalHyperspheres, 1, MPI_INT,
-                          allNumHyperspheres.data(), 1, MPI_INT, node_comm);
-            MPI_Allgather(&localIDSize, 1, MPI_INT,
-                          allIDSizes.data(), 1, MPI_INT, node_comm);
+            MPI_Allgather(&localIDSize, 1, MPI_INT, allIDSizes.data(), 1, MPI_INT, node_comm);
 
-            // Compute displacements
-            int totalHyperspheres = std::accumulate(allNumHyperspheres.begin(), allNumHyperspheres.end(), 0);
             int totalIDSize = std::accumulate(allIDSizes.begin(), allIDSizes.end(), 0);
 
-            std::vector<int> displsScores(node_size, 0);
+            // Prepare displacements for IDs
             std::vector<int> displsIDs(node_size, 0);
             for (int i = 1; i < node_size; ++i) {
-                displsScores[i] = displsScores[i - 1] + allNumHyperspheres[i - 1];
                 displsIDs[i] = displsIDs[i - 1] + allIDSizes[i - 1];
             }
 
-            // Gather all scores and identifiers within the node
-            std::vector<double> allScores(totalHyperspheres);
-            MPI_Allgatherv(localScoresOnly.data(), numLocalHyperspheres, MPI_DOUBLE,
-                           allScores.data(), allNumHyperspheres.data(), displsScores.data(), MPI_DOUBLE, node_comm);
-
+            // Gather serialized IDs
             std::vector<int> allIDsSerialized(totalIDSize);
             MPI_Allgatherv(localIDsSerialized.data(), localIDSize, MPI_INT,
                            allIDsSerialized.data(), allIDSizes.data(), displsIDs.data(), MPI_INT, node_comm);
 
             // Reconstruct all IDs
-            std::vector<HypersphereID> allIDs(totalHyperspheres);
+            std::vector<HypersphereID> allIDs(totalDataSize);
             size_t offset = 0;
-            for (int i = 0; i < totalHyperspheres; ++i) {
+            for (int i = 0; i < totalDataSize; ++i) {
                 allIDs[i] = deserializeHypersphereID(allIDsSerialized, offset);
             }
 
-            // Select best hyperspheres within the node
-            std::vector<int> selectedIndices = selectBestIndices(allScores, beta);
+            // Node-level selection of top 'beta' hyperspheres
+            int nodeBeta = std::min(beta, totalDataSize);
+            std::vector<int> nodeSelectedIndices = selectBestIndices(allScores, nodeBeta);
 
-            std::vector<Hypersphere> selectedHyperspheres;
-            for (int idx : selectedIndices) {
-                HypersphereID selectedID = allIDs[idx];
-                Hypersphere hs(dimension, depth, selectedID);
-                selectedHyperspheres.push_back(hs);
+            std::vector<double> nodeTopScores(nodeBeta);
+            std::vector<HypersphereID> nodeTopIDs(nodeBeta);
+            for (int i = 0; i < nodeBeta; ++i) {
+                int idx = nodeSelectedIndices[i];
+                nodeTopScores[i] = allScores[idx];
+                nodeTopIDs[i] = allIDs[idx];
             }
 
             // Node leaders exchange best hyperspheres across nodes
             if (node_rank == 0) {
                 // Prepare data for inter-node communication
-                int numSelected = selectedHyperspheres.size();
-                std::vector<double> nodeLocalScores(numSelected);
-                std::vector<int> nodeLocalIDsSerialized;
+                int nodeLocalDataSize = nodeBeta;
+                std::vector<int> nodeAllDataSizes(num_nodes);
+                MPI_Allgather(&nodeLocalDataSize, 1, MPI_INT, nodeAllDataSizes.data(), 1, MPI_INT, node_leader_comm);
 
-                for (int i = 0; i < numSelected; ++i) {
-                    nodeLocalScores[i] = allScores[selectedIndices[i]];
-                    auto serializedID = serializeHypersphereID(selectedHyperspheres[i].id);
+                int nodeTotalDataSize = std::accumulate(nodeAllDataSizes.begin(), nodeAllDataSizes.end(), 0);
+
+                // Prepare displacements
+                std::vector<int> nodeDispls(num_nodes, 0);
+                for (int i = 1; i < num_nodes; ++i) {
+                    nodeDispls[i] = nodeDispls[i - 1] + nodeAllDataSizes[i - 1];
+                }
+
+                // Gather scores among node leaders
+                std::vector<double> nodeAllScores(nodeTotalDataSize);
+                MPI_Allgatherv(nodeTopScores.data(), nodeLocalDataSize, MPI_DOUBLE,
+                               nodeAllScores.data(), nodeAllDataSizes.data(), nodeDispls.data(), MPI_DOUBLE, node_leader_comm);
+
+                // Serialize nodeTopIDs
+                std::vector<int> nodeLocalIDsSerialized;
+                for (const auto& id : nodeTopIDs) {
+                    auto serializedID = serializeHypersphereID(id);
                     nodeLocalIDsSerialized.insert(nodeLocalIDsSerialized.end(), serializedID.begin(), serializedID.end());
                 }
 
-                // Communicate sizes among node leaders
+                // Gather sizes of serialized IDs among node leaders
                 int nodeLocalIDSize = nodeLocalIDsSerialized.size();
-                std::vector<int> nodeAllNumHyperspheres(num_nodes);
                 std::vector<int> nodeAllIDSizes(num_nodes);
-                MPI_Allgather(&numSelected, 1, MPI_INT,
-                              nodeAllNumHyperspheres.data(), 1, MPI_INT, node_leader_comm);
-                MPI_Allgather(&nodeLocalIDSize, 1, MPI_INT,
-                              nodeAllIDSizes.data(), 1, MPI_INT, node_leader_comm);
+                MPI_Allgather(&nodeLocalIDSize, 1, MPI_INT, nodeAllIDSizes.data(), 1, MPI_INT, node_leader_comm);
 
-                // Compute displacements
-                int nodeTotalHyperspheres = std::accumulate(nodeAllNumHyperspheres.begin(), nodeAllNumHyperspheres.end(), 0);
                 int nodeTotalIDSize = std::accumulate(nodeAllIDSizes.begin(), nodeAllIDSizes.end(), 0);
 
-                std::vector<int> nodeDisplsScores(num_nodes, 0);
+                // Prepare displacements for IDs
                 std::vector<int> nodeDisplsIDs(num_nodes, 0);
                 for (int i = 1; i < num_nodes; ++i) {
-                    nodeDisplsScores[i] = nodeDisplsScores[i - 1] + nodeAllNumHyperspheres[i - 1];
                     nodeDisplsIDs[i] = nodeDisplsIDs[i - 1] + nodeAllIDSizes[i - 1];
                 }
 
-                // Gather all scores and identifiers among node leaders
-                std::vector<double> nodeAllScores(nodeTotalHyperspheres);
-                MPI_Allgatherv(nodeLocalScores.data(), numSelected, MPI_DOUBLE,
-                               nodeAllScores.data(), nodeAllNumHyperspheres.data(), nodeDisplsScores.data(), MPI_DOUBLE, node_leader_comm);
-
+                // Gather serialized IDs among node leaders
                 std::vector<int> nodeAllIDsSerialized(nodeTotalIDSize);
                 MPI_Allgatherv(nodeLocalIDsSerialized.data(), nodeLocalIDSize, MPI_INT,
                                nodeAllIDsSerialized.data(), nodeAllIDSizes.data(), nodeDisplsIDs.data(), MPI_INT, node_leader_comm);
 
-                // Reconstruct all IDs and select best hyperspheres across nodes
-                std::vector<HypersphereID> nodeAllIDs(nodeTotalHyperspheres);
-                offset = 0;
-                for (int i = 0; i < nodeTotalHyperspheres; ++i) {
-                    nodeAllIDs[i] = deserializeHypersphereID(nodeAllIDsSerialized, offset);
+                // Reconstruct all IDs
+                std::vector<HypersphereID> nodeAllIDs(nodeTotalDataSize);
+                size_t offsetNode = 0;
+                for (int i = 0; i < nodeTotalDataSize; ++i) {
+                    nodeAllIDs[i] = deserializeHypersphereID(nodeAllIDsSerialized, offsetNode);
                 }
 
-                selectedIndices = selectBestIndices(nodeAllScores, beta);
-                selectedHyperspheres.clear();
-                for (int idx : selectedIndices) {
+                // Global selection of top 'beta' hyperspheres
+                int globalBeta = std::min(beta, nodeTotalDataSize);
+                std::vector<int> globalSelectedIndices = selectBestIndices(nodeAllScores, globalBeta);
+
+                std::vector<Hypersphere> selectedHyperspheres;
+                for (int idx : globalSelectedIndices) {
                     HypersphereID selectedID = nodeAllIDs[idx];
                     Hypersphere hs(dimension, depth, selectedID);
                     selectedHyperspheres.push_back(hs);
                 }
-            }
 
-            // Broadcast the number of selected hyperspheres
-            int numSelected;
-            if (node_rank == 0) {
-                numSelected = selectedHyperspheres.size();
-            }
-            MPI_Bcast(&numSelected, 1, MPI_INT, 0, node_comm);
+                // Evaluate points of the best-scored hypersphere
+                Hypersphere bestHypersphere = selectedHyperspheres[0];
 
-            // Broadcast serialized identifiers
-            std::vector<int> selectedIDsSerialized;
-            if (node_rank == 0) {
+                // Reconstruct the center and radius of the best hypersphere
+                auto bestCenter = reconstructCenter(bestHypersphere, initialCenter, initialRadius);
+
+                // Generate points around the center
+                auto points = generateRandomPointsAroundCenter(bestCenter, initialRadius, dimension);
+
+                // Evaluate the objective function at each point
+                auto pointsHost = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), points);
+
+                double localBestObjective = std::numeric_limits<double>::max();
+                Kokkos::View<double*, Kokkos::LayoutLeft, Kokkos::HostSpace> localBestSolution("localBestSolution", dimension);
+
+                for (int i = 0; i < pointsHost.extent(0); ++i) {
+                    auto x = Kokkos::subview(pointsHost, i, Kokkos::ALL());
+                    double fx = sphereObjectiveFunction(x);
+
+                    if (fx < localBestObjective) {
+                        localBestObjective = fx;
+                        for (int d = 0; d < dimension; ++d) {
+                            localBestSolution(d) = x(d);
+                        }
+                    }
+                }
+
+                // Update bestSolution and bestObjectiveValue
+                bestObjectiveValue = localBestObjective;
+                Kokkos::deep_copy(bestSolution, localBestSolution);
+
+                // Broadcast selected hyperspheres to all nodes
+                int numSelected = selectedHyperspheres.size();
+                MPI_Bcast(&numSelected, 1, MPI_INT, 0, node_comm);
+
+                // Serialize selected hyperspheres' IDs
+                std::vector<int> selectedIDsSerialized;
                 for (const auto& hs : selectedHyperspheres) {
                     auto serializedID = serializeHypersphereID(hs.id);
                     selectedIDsSerialized.insert(selectedIDsSerialized.end(), serializedID.begin(), serializedID.end());
                 }
+
+                int selectedTotalIDSize = selectedIDsSerialized.size();
+                MPI_Bcast(&selectedTotalIDSize, 1, MPI_INT, 0, node_comm);
+
+                MPI_Bcast(selectedIDsSerialized.data(), selectedTotalIDSize, MPI_INT, 0, node_comm);
+
+                // Reconstruct selected hyperspheres
+                std::vector<Hypersphere> selectedHyperspheresAll;
+                offset = 0;
+                for (int i = 0; i < numSelected; ++i) {
+                    HypersphereID selectedID = deserializeHypersphereID(selectedIDsSerialized, offset);
+                    Hypersphere hs(dimension, depth, selectedID);
+                    selectedHyperspheresAll.push_back(hs);
+                }
+
+                // Update currentHyperspheres for the next depth
+                currentHyperspheres = std::move(selectedHyperspheresAll);
+            } else {
+                // Non-leader nodes receive selected hyperspheres
+                int numSelected;
+                MPI_Bcast(&numSelected, 1, MPI_INT, 0, node_comm);
+
+                int selectedTotalIDSize;
+                MPI_Bcast(&selectedTotalIDSize, 1, MPI_INT, 0, node_comm);
+
+                std::vector<int> selectedIDsSerialized(selectedTotalIDSize);
+                MPI_Bcast(selectedIDsSerialized.data(), selectedTotalIDSize, MPI_INT, 0, node_comm);
+
+                // Reconstruct selected hyperspheres
+                std::vector<Hypersphere> selectedHyperspheres;
+                offset = 0;
+                for (int i = 0; i < numSelected; ++i) {
+                    HypersphereID selectedID = deserializeHypersphereID(selectedIDsSerialized, offset);
+                    Hypersphere hs(dimension, depth, selectedID);
+                    selectedHyperspheres.push_back(hs);
+                }
+
+                // Update currentHyperspheres for the next depth
+                currentHyperspheres = std::move(selectedHyperspheres);
             }
-            int selectedTotalIDSize = selectedIDsSerialized.size();
-            MPI_Bcast(&selectedTotalIDSize, 1, MPI_INT, 0, node_comm);
 
-            if (node_rank != 0) {
-                selectedIDsSerialized.resize(selectedTotalIDSize);
-            }
-            MPI_Bcast(selectedIDsSerialized.data(), selectedTotalIDSize, MPI_INT, 0, node_comm);
+            // Broadcast bestObjectiveValue and bestSolution
+            MPI_Bcast(&bestObjectiveValue, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-            // Reconstruct selected hyperspheres
-            selectedHyperspheres.clear();
-            offset = 0;
-            for (int i = 0; i < numSelected; ++i) {
-                HypersphereID selectedID = deserializeHypersphereID(selectedIDsSerialized, offset);
-                Hypersphere hs(dimension, depth, selectedID);
-                selectedHyperspheres.push_back(hs);
-            }
-
-
-            // Update currentHyperspheres for the next depth
-            currentHyperspheres = std::move(selectedHyperspheres);
+            auto hostBestSolution = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), bestSolution);
+            MPI_Bcast(hostBestSolution.data(), dimension, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+            Kokkos::deep_copy(bestSolution, hostBestSolution);
 
             // Check for maximum depth
             if (depth == maxDepth) {
@@ -1007,6 +1097,15 @@ int main(int argc, char* argv[]) {
                 if (world_rank == 0) {
                     // Output the point with the minimum objective function value
                     std::cout << "Minimum objective value: " << globalMin.value << std::endl;
+
+                    // Define the known global minimum for Sphere function
+                    const double SPHERE_GLOBAL_MIN = 0.0;
+
+                    // Calculate the difference between the found value and the global minimum
+                    double sphereDifference = globalMin.value - SPHERE_GLOBAL_MIN;
+
+                    // Print the Sphere metric
+                    std::cout << "Sphere Difference from Global Minimum: " << sphereDifference << std::endl;
 
                     // Output summary statistics
                     double minVal = globalBestPointHost(0);
