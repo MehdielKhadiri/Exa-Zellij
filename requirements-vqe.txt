@@ -1,0 +1,9 @@
+# Local CPU/emulator environment. LUMI-G users should use the site ROCm/JAX
+# container described in docs/lumi-g.md instead of installing CPU jaxlib.
+jax==0.6.2
+jaxlib==0.6.2
+numpy==2.2.6
+pennylane==0.42.3
+pennylane-lightning==0.42.0
+pyscf==2.10.0
+h5py==3.14.0

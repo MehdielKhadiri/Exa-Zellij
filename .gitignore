@@ -1,0 +1,38 @@
+# Build products
+/build*/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+*.o
+*.so
+*.a
+*.out
+*.err
+
+# Runtime output and checkpoints
+/results/
+/logs*/
+/checkpoints/
+*.csv
+*.log
+core
+core.*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Quantum data caches and compiled JAX artifacts
+.cache/
+pl-data-cache/
+jax_persistent_cache/
+*.h5
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

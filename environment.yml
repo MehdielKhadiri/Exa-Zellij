@@ -1,0 +1,12 @@
+name: fractal-quantum-optimizer
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - cmake>=3.20
+  - ninja
+  - mpi
+  - pybind11=2.12
+  - pip
+  - pip:
+      - -r requirements-vqe.txt
