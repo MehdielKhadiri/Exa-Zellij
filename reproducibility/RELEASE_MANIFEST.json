@@ -30,7 +30,7 @@
       "missing_evidence": [
         "source logs for the 10-to-100-node scaling pair",
         "internal run log for the maxiter=100 1,000-node endpoint",
-        "source logs for three of the nine solution-quality rows"
+        "final-energy source logs for two of the nine solution-quality rows"
       ]
     }
   },

@@ -48,6 +48,29 @@ scheduler excerpt is normalized to `$HOME`.
   0: Minimum objective value: -126.805778503
   0: Total Execution time: 281.378159706 seconds
 
+[quality_OH-_scheduler]
+=== JOB 14728011 started at Mon 17 Nov 2025 01:11:46 PM EET ===
+>>> Running molecule: HF | nodes=10 rpn=8 total_ranks=80
+>>> Finished molecule: HF at Mon Nov 17 14:03:47 EET 2025
+>>> Running molecule: OH- | nodes=10 rpn=8 total_ranks=80
+>>> Finished molecule: OH- at Mon Nov 17 14:50:56 EET 2025
+=== JOB 14728011 finished at Mon Nov 17 14:50:56 EET 2025 ===
+
+[quality_HF_scheduler]
+Same source and scheduler envelope as [quality_OH-_scheduler].
+
+[quality_LiH]
+topk_global.csv header fields used: rank,f
+54,-7.871368408203125
+
+[quality_LiH_scheduler]
+=== JOB 14871772 started at Mon 24 Nov 2025 02:41:36 PM EET ===
+>>> Running molecule: NeH+ | nodes=10 rpn=8 total_ranks=80
+>>> Finished molecule: NeH+ at Mon Nov 24 14:45:14 EET 2025
+>>> Running molecule: LiH | nodes=10 rpn=8 total_ranks=80
+>>> Finished molecule: LiH at Mon Nov 24 14:58:25 EET 2025
+=== JOB 14871772 finished at Mon Nov 24 14:58:25 EET 2025 ===
+
 [quality_BH3]
  0: Minimum objective value: -26.0947723389
  0: Total Execution time: 13087.3101428 seconds

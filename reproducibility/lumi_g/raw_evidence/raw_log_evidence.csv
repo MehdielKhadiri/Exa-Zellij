@@ -9,5 +9,9 @@ quality_HeH+,quality,distributed_quality,HeH+,10,80,14681842,logs_14681842/vqe_H
 quality_H3+,quality,distributed_quality,H3+,10,80,14681842,logs_14681842/vqe_H3__14681842.log,154348,35a119274a660e7b62d738c457d00e676c3029d83f91af96c18eaaeb9314932a,-1.26217591763,64.887328399,exact
 quality_H4,quality,distributed_quality,H4,10,80,14681842,logs_14681842/vqe_H4_14681842.log,168979,41f8fb720b46fa89363125b43a055dd1672e6d265f66974e0f8e549cc743a4ba,-2.16947031021,796.179231311,exact
 quality_NeH+,quality,distributed_quality,NeH+,50,400,14611463,NeH_50_nodes_1000_beta/vqe_NeH__14611463.log,784324,734e875d816dccc14362c678fc1a16dd31acd18977d706c5f761f8ca064bf173,-126.805778503,281.378159706,energy_only
+quality_OH-_scheduler,quality,distributed_quality,OH-,10,80,14728011,vqe-sweep-14728011.out,914,0af78d65410a32e4d7fb13f3e638e3ef5a16c1b89490afb531f884843a95183c,NA,NA,scheduler_only
+quality_HF_scheduler,quality,distributed_quality,HF,10,80,14728011,vqe-sweep-14728011.out,914,0af78d65410a32e4d7fb13f3e638e3ef5a16c1b89490afb531f884843a95183c,NA,NA,scheduler_only
+quality_LiH,quality,distributed_quality,LiH,10,80,14871772,topk_global.csv,10989,857993a2f7384d24e41c44043458e3678264ca5a7c5135939c8a984a3b8a2409,-7.871368408203125,NA,energy_only
+quality_LiH_scheduler,quality,distributed_quality,LiH,10,80,14871772,vqe-sweep-14871772.out,920,d5347c4dc81ee8c1dc4fd0c82d4dbba85f4bf2f3d7f88b4e81fde10dea17bb56,NA,NA,scheduler_only
 quality_BH3,quality,distributed_quality,BH3,30,240,14639177,BH3_30_nodes_run/vqe_BH3_14639177.log,519816,fad976ef220a0ffaaa9878bdeffb7b5c69bdff2a8476cb769485cac4eaeab8f1,-26.0947723389,13087.3101428,exact
 quality_CH4,quality,distributed_quality,CH4,10,80,14768273,CH4_10_nodes_1_beta_1_maxiter/vqe_CH4_14768273.log,427493,d8dd52a5d423e99f1238eb8f43088d9af693f209cb63143ffb93934dad15e339,-39.7705345154,121674.749651,exact

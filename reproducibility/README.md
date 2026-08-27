@@ -18,6 +18,12 @@ python reproducibility/verify_results.py
 The command validates checksums and should end with
 `reproducibility verification: OK`.
 
+For a curated archive containing only Grid'5000 and LUMI-G evidence, use:
+
+```bash
+python reproducibility/verify_results.py --scopes grid5000,lumi_g
+```
+
 ## What is included
 
 ```text
@@ -80,8 +86,9 @@ under `lumi_g/results/` and are internally rechecked by the verifier.  A
 recovered LUMI-G home-directory backup was audited after the initial assembly.
 `lumi_g/raw_evidence/` records exact source-file hashes and verbatim terminal
 excerpts for the source logs that were found.  It directly supports five of
-the eight scaling timestamps and six of the nine solution-quality energies,
-and includes the scheduler completion record for the 8,000-rank endpoint.
+the eight scaling timestamps and seven of the nine solution-quality energies,
+and includes scheduler completion records for the 8,000-rank endpoint and the
+HF, OH-, and LiH quality runs.
 
 The backup does not contain every specific log used by the final manuscript.
 Unsupported coordinates therefore remain explicitly labeled

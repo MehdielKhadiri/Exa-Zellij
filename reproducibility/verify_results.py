@@ -162,7 +162,7 @@ def verify_lumi_quality() -> dict[str, int]:
 
 def verify_lumi_raw_evidence() -> dict[str, int]:
     evidence = read_csv("lumi_g/raw_evidence/raw_log_evidence.csv")
-    assert len(evidence) == 12
+    assert len(evidence) == 16
     indexed = {row["evidence_id"]: row for row in evidence}
     assert len(indexed) == len(evidence)
     for row in evidence:
@@ -218,10 +218,25 @@ def verify_lumi_raw_evidence() -> dict[str, int]:
         float(quality["NeH+"]["best_energy_ha"]),
         abs_tol=5e-10,
     )
+    lih = indexed["quality_LiH"]
+    assert lih["paper_support"] == "energy_only"
+    assert math.isclose(
+        float(lih["best_energy_ha"]),
+        float(quality["LiH"]["best_energy_ha"]),
+        abs_tol=5e-11,
+    )
+    scheduler_quality = (
+        "quality_OH-_scheduler",
+        "quality_HF_scheduler",
+        "quality_LiH_scheduler",
+    )
+    for evidence_id in scheduler_quality:
+        assert indexed[evidence_id]["paper_support"] == "scheduler_only"
     return {
-        "indexed_source_files": len(evidence),
+        "indexed_evidence_records": len(evidence),
+        "unique_source_files": len({row["source_sha256"] for row in evidence}),
         "paper_scaling_times_backed": len(time_checks),
-        "paper_quality_energies_backed": len(exact_quality) + 1,
+        "paper_quality_energies_backed": len(exact_quality) + 2,
     }
 
 
@@ -244,15 +259,27 @@ def verify_checksums() -> int:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-checksums", action="store_true")
+    parser.add_argument(
+        "--scopes",
+        default="grid5000,local,lumi_g",
+        help="comma-separated verification scopes: grid5000, local, lumi_g",
+    )
     args = parser.parse_args()
-    report = {
-        "black_box_equal_call": verify_black_box(),
-        "knowledge_driven": verify_knowledge_driven(),
-        "robustness": verify_robustness(),
-        "lumi_g_scaling": verify_lumi_scaling(),
-        "lumi_g_solution_quality": verify_lumi_quality(),
-        "lumi_g_raw_evidence": verify_lumi_raw_evidence(),
-    }
+    scopes = {scope.strip() for scope in args.scopes.split(",") if scope.strip()}
+    allowed_scopes = {"grid5000", "local", "lumi_g"}
+    unknown_scopes = scopes - allowed_scopes
+    if unknown_scopes:
+        parser.error(f"unknown verification scope(s): {', '.join(sorted(unknown_scopes))}")
+    report = {}
+    if "grid5000" in scopes:
+        report["black_box_equal_call"] = verify_black_box()
+        report["knowledge_driven"] = verify_knowledge_driven()
+    if "local" in scopes:
+        report["robustness"] = verify_robustness()
+    if "lumi_g" in scopes:
+        report["lumi_g_scaling"] = verify_lumi_scaling()
+        report["lumi_g_solution_quality"] = verify_lumi_quality()
+        report["lumi_g_raw_evidence"] = verify_lumi_raw_evidence()
     if not args.skip_checksums:
         report["checksummed_files"] = verify_checksums()
     print(json.dumps(report, indent=2, sort_keys=True))

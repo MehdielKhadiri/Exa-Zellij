@@ -31,10 +31,18 @@ its byte size and SHA-256 digest, and preserves its result-bearing lines.
 
 The recovered files exactly support the 1-to-10-node and
 100-to-1,000-node (`maxiter=10`) scaling pairs, the 100-node reference of the
-`maxiter=100` pair, and six solution-quality energies.  The 8,000-rank
+`maxiter=100` pair, and seven solution-quality energies.  Scheduler records
+also corroborate the HF, OH-, and LiH execution envelopes.  The 8,000-rank
 `maxiter=100` scheduler stdout confirms successful execution on 1,000 nodes,
 but its detailed run log containing the 1,709.20-second internal timing was not
-recovered.  The 10-to-100-node scaling pair and the remaining three quality
-rows likewise have no matching source log in this backup.  Those values are a
-faithful transcription of the final manuscript and remain labeled
+recovered.  The 10-to-100-node scaling pair and the OH-/HF final-energy logs
+likewise have no matching detailed source log in this backup.  Those values
+are a faithful transcription of the final manuscript and remain labeled
 **paper-derived**, not raw-log-derived.
+
+The original `elkhadir.tar` was also audited directly.  Its final member is a
+5.79 GB container image for which only 2.88 GB was archived, so standard tar
+tools correctly report a truncated final member.  All preceding metadata are
+readable.  None of the absent detailed logs listed above appears in that tar
+index; the scheduler outputs and LiH `topk_global.csv` are the additional
+recoverable evidence integrated here.
