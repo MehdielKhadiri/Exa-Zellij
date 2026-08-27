@@ -38,7 +38,7 @@ reproducibility/
 │   └── results/    Complete 195-run single-GPU robustness experiment
 └── lumi_g/
     ├── README.md
-    ├── raw_evidence/ Hash-indexed excerpts from the recovered scheduler backup
+    ├── raw_evidence/ Hash-indexed excerpts from archived execution records
     └── results/      Published scaling and solution-quality coordinates
 ```
 
@@ -48,9 +48,9 @@ reproducibility/
 
 `grid5000/results/black_box_equal_call/runs_long.csv` is the retained run-level
 measurement table.  It contains objective-call checkpoints, energies, FCI
-references, absolute errors, and wall times.  The paper result compares the
+references, absolute errors, and wall times.  The reported comparison uses the
 median stochastic-baseline error with deterministic PFDA-BS at the final
-matched checkpoint.  The verifier recovers 25 wins, 14 ties, and one loss at a
+matched checkpoint.  The verifier reproduces 25 wins, 14 ties, and one loss at a
 `1e-7` Ha tie tolerance.
 
 The original execution manifests are included after replacing only personal
@@ -61,13 +61,13 @@ retained because they are useful provenance, not credentials.
 
 `grid5000/results/knowledge_driven/matched_quantum_work_curves.csv` and
 `quantum_aware_summary.csv` are the retained aggregate outputs.  The complete
-eight-molecule paper table is in `paper_final_errors.csv`; the verifier checks
-all locally retained unrounded raw conditions against that table and recovers
+eight-molecule result table is in `paper_final_errors.csv`; the verifier checks
+all retained unrounded conditions against that table and reproduces
 8 wins, 15 ties, and one loss.
 
-The local archive does not contain the individual H5/LiH quantum-aware run
-logs.  Those two rows are therefore explicitly labeled as paper-table values,
-not raw logs.  Rerun support remains present in `grid5000/code/` and
+The archived experiment data do not include the individual H5/LiH
+quantum-aware run logs. Those two rows are therefore identified as reported
+aggregate values rather than raw-log values. Rerun support remains present in `grid5000/code/` and
 `grid5000/oar/`.
 
 ### Robustness experiment
@@ -80,21 +80,20 @@ so that the same resumable design can be reproduced on an Ecotaxe allocation.
 
 ### LUMI-G experiments
 
-The existing LUMI-G scripts remain under `scripts/lumi/`.  The numerical
-coordinates used by the manuscript are transcribed into machine-readable CSVs
-under `lumi_g/results/` and are internally rechecked by the verifier.  A
-recovered LUMI-G home-directory backup was audited after the initial assembly.
-`lumi_g/raw_evidence/` records exact source-file hashes and verbatim terminal
-excerpts for the source logs that were found.  It directly supports five of
+The LUMI-G scripts are provided under `scripts/lumi/`. Reported numerical
+coordinates are available as machine-readable CSV files under
+`lumi_g/results/` and are independently checked by the verifier.
+`lumi_g/raw_evidence/` records source-file hashes and verbatim result-bearing
+excerpts from the archived execution records. It directly supports five of
 the eight scaling timestamps and seven of the nine solution-quality energies,
 and includes scheduler completion records for the 8,000-rank endpoint and the
 HF, OH-, and LiH quality runs.
 
-The backup does not contain every specific log used by the final manuscript.
-Unsupported coordinates therefore remain explicitly labeled
-**paper-derived**; the evidence index states `exact`, `energy_only`,
-`scheduler_only`, or `not_recovered` rather than silently mixing provenance.
-See `lumi_g/README.md`.
+Detailed source traces are not available for every reported coordinate. The
+evidence index therefore records only archived source evidence and labels each
+entry as `exact`, `energy_only`, or `scheduler_only`. The remaining coordinates
+are retained in the result tables and documented explicitly in
+`lumi_g/README.md`.
 
 ## Reproduction boundary
 

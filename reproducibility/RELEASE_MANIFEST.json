@@ -23,7 +23,7 @@
       "accelerator": "AMD MI250X GPU compute dies",
       "included_evidence": [
         "SLURM rerun material",
-        "hash-indexed recovered-log evidence and verbatim result excerpts",
+        "hash-indexed archived execution evidence and verbatim result excerpts",
         "strong-scaling coordinates with per-point provenance",
         "nine-molecule solution-quality table with per-row provenance"
       ],
@@ -38,6 +38,6 @@
   "notes": [
     "Personal filesystem identities were removed from retained manifests.",
     "Grid'5000 job identifiers and cluster hostnames were retained as execution provenance.",
-    "No credentials, access tokens, scheduler accounts, container images, or home-directory backup are distributed."
+    "No credentials, access tokens, scheduler accounts, container images, or complete execution-environment snapshots are distributed."
   ]
 }

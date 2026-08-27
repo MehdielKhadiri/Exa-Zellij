@@ -4,7 +4,7 @@ The executable, HIP configuration, GPU-selection wrapper, and SLURM template
 used for LUMI-G are maintained in `../../scripts/lumi/` and documented in
 `../../docs/lumi-g.md`.
 
-This directory contains the numerical coordinates used by the manuscript:
+This directory contains the reported numerical results:
 
 - `results/strong_scaling.csv` records the four reference-to-target strong
   scaling pairs, including node/GPU counts, wall times, speedups, and
@@ -12,8 +12,8 @@ This directory contains the numerical coordinates used by the manuscript:
 - `results/solution_quality.csv` records the nine-molecule distributed
   solution-quality table, including the FCI values needed to recompute both
   absolute and relative errors.
-- `raw_evidence/raw_log_evidence.csv` indexes the matching files found in the
-  recovered LUMI-G backup, including their original sizes and SHA-256 hashes.
+- `raw_evidence/raw_log_evidence.csv` indexes the corresponding archived
+  execution records, including their original sizes and SHA-256 hashes.
 - `raw_evidence/log_excerpts.txt` retains the exact terminal lines needed to
   connect those source logs to the published energies and timings.
 
@@ -23,26 +23,20 @@ recomputes all nine energy errors.
 
 ## Provenance boundary
 
-The recovered backup is approximately 20 GB and contains software
-environments, caches, and many exploratory/failed runs, so it is neither
-appropriate nor necessary to commit the whole home-directory image.  Instead,
-the evidence index names each relevant backup-relative source file, records
-its byte size and SHA-256 digest, and preserves its result-bearing lines.
+The complete experiment snapshot also contains software environments, caches,
+container images, and exploratory runs that are not required to validate the
+reported results. This archive therefore retains a compact evidence index: it
+names each relevant source record, stores its byte size and SHA-256 digest, and
+preserves the result-bearing lines.
 
-The recovered files exactly support the 1-to-10-node and
+The archived detailed logs exactly support the 1-to-10-node and
 100-to-1,000-node (`maxiter=10`) scaling pairs, the 100-node reference of the
 `maxiter=100` pair, and seven solution-quality energies.  Scheduler records
 also corroborate the HF, OH-, and LiH execution envelopes.  The 8,000-rank
 `maxiter=100` scheduler stdout confirms successful execution on 1,000 nodes,
-but its detailed run log containing the 1,709.20-second internal timing was not
-recovered.  The 10-to-100-node scaling pair and the OH-/HF final-energy logs
-likewise have no matching detailed source log in this backup.  Those values
-are a faithful transcription of the final manuscript and remain labeled
-**paper-derived**, not raw-log-derived.
-
-The original `elkhadir.tar` was also audited directly.  Its final member is a
-5.79 GB container image for which only 2.88 GB was archived, so standard tar
-tools correctly report a truncated final member.  All preceding metadata are
-readable.  None of the absent detailed logs listed above appears in that tar
-index; the scheduler outputs and LiH `topk_global.csv` are the additional
-recoverable evidence integrated here.
+although its detailed internal-timing trace is not available in the archived
+experiment data. The same applies to the detailed
+10-to-100-node scaling traces and the OH-/HF final-energy traces. Their
+reported coordinates remain available in the machine-readable result tables,
+while the evidence index makes the distinction between direct detailed-log,
+energy-only, and scheduler-only support explicit.

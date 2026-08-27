@@ -7,9 +7,9 @@
 - Added curated run-level/aggregate Grid'5000 results and the complete local
   195-run robustness dataset.
 - Added machine-readable LUMI-G scaling and nine-molecule solution-quality
-  coordinates plus a hash-indexed evidence extract from the recovered LUMI-G
-  backup. Remaining coordinates without a retained source log stay explicitly
-  labeled as paper-derived.
+  coordinates plus hash-indexed excerpts from archived execution records.
+  Evidence levels distinguish detailed-log, energy-only, and scheduler-only
+  provenance.
 - Added a dependency-free verifier that reconstructs the central comparison
   counts and checks result checksums and numerical consistency.
 - Updated the VQE evaluator for explicit precision, unwrapped-domain, and

@@ -1,5 +1,5 @@
-LUMI-G RECOVERED LOG EVIDENCE
-=============================
+LUMI-G ARCHIVED EXECUTION EVIDENCE
+==================================
 
 Each block is a result-bearing excerpt from the source file named in
 raw_log_evidence.csv. Original byte sizes and SHA-256 hashes are recorded

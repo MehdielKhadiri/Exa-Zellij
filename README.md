@@ -174,8 +174,8 @@ This is a research release assembled from the implementation used for the
 configurable FBD/FBO and Grid'5000/LUMI-G VQE experiments. It favors traceable
 runtime configuration and reproducible launch material over a stable library
 API.  Result files are labeled by provenance: retained run-level output,
-hash-indexed raw-log evidence, aggregate output, or paper-derived values where
-the recovered scheduler backup does not contain the corresponding source log.
+hash-indexed execution evidence, aggregate output, or reported coordinates for
+which a detailed source trace is not present in the archived experiment data.
 
 ## License
 

@@ -98,7 +98,7 @@ def verify_knowledge_driven() -> dict[str, int]:
         "qng-diag": "qng_diag",
         "excitation-solve": "excitation_solve",
     }
-    # Every locally retained raw condition must agree with the rounded paper table.
+    # Every retained raw condition must agree with the rounded reported table.
     for (molecule, method), value in raw_index.items():
         paper = next(row for row in rows if row["molecule"] == molecule)
         rounded = float(paper[method_columns[method]])
