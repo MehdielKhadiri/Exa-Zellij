@@ -1,0 +1,5 @@
+configuration,beam_width,maxiter,reference_nodes,target_nodes,reference_gpus,target_gpus,reference_time_s,target_time_s,speedup,efficiency_percent
+beta1k_iter1,1000,1,1,10,8,80,7054.17,766.48,9.20,92.03
+beta10k_iter1,10000,1,10,100,80,800,3380.75,418.69,8.07,80.75
+beta10k_iter10,10000,10,100,1000,800,8000,3549.80,619.71,5.73,57.28
+beta10k_iter100,10000,100,100,1000,800,8000,10422.02,1709.20,6.10,60.98

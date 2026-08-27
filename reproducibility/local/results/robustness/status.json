@@ -1,0 +1,12 @@
+{
+  "common_calls": {
+    "H3+": 289,
+    "H4": 2678,
+    "HeH+": 49
+  },
+  "expected": 195,
+  "missing": 0,
+  "protocol": "PFDA-BS-hyperparameter-robustness-v1",
+  "recorded": 195,
+  "validation_errors": 0
+}

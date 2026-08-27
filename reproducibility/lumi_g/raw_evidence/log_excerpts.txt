@@ -1,0 +1,57 @@
+LUMI-G RECOVERED LOG EVIDENCE
+=============================
+
+Each block is a result-bearing excerpt from the source file named in
+raw_log_evidence.csv. Original byte sizes and SHA-256 hashes are recorded
+there. Rank prefixes are retained; the personal home-directory prefix in the
+scheduler excerpt is normalized to `$HOME`.
+
+[scaling_beta1k_iter1_ref]
+0: Minimum objective value: -126.805618286
+0: Total Execution time: 7054.16612371 seconds
+
+[scaling_beta1k_iter1_target]
+ 0: Minimum objective value: -126.805854797
+ 0: Total Execution time: 766.484688947 seconds
+
+[scaling_beta10k_iter10_ref]
+  0: Minimum objective value: -126.808174133
+  0: Total Execution time: 3549.79805511 seconds
+
+[scaling_beta10k_iter10_target]
+   0: Minimum objective value: -126.808174133
+   0: Total Execution time: 619.706120274 seconds
+
+[scaling_beta10k_iter100_ref]
+  0: Minimum objective value: -126.808174133
+  0: Total Execution time: 10422.0249775 seconds
+
+[scaling_beta10k_iter100_target_scheduler]
+=== JOB 14738015 on nid005181 started at Tue 18 Nov 2025 04:01:45 AM EET ===
+>>> Running molecule: NeH+ | nodes=1000 rpn=8 total_ranks=8000 | log: $HOME/logs_14738015/vqe_NeH__14738015.log
+>>> Finished molecule: NeH+ at Tue Nov 18 04:32:38 EET 2025
+=== JOB 14738015 finished at Tue Nov 18 04:32:38 EET 2025 ===
+
+[quality_HeH+]
+ 0: Minimum objective value: -2.85156297684
+ 0: Total Execution time: 53.341199932 seconds
+
+[quality_H3+]
+ 0: Minimum objective value: -1.26217591763
+ 0: Total Execution time: 64.887328399 seconds
+
+[quality_H4]
+ 0: Minimum objective value: -2.16947031021
+ 0: Total Execution time: 796.179231311 seconds
+
+[quality_NeH+]
+  0: Minimum objective value: -126.805778503
+  0: Total Execution time: 281.378159706 seconds
+
+[quality_BH3]
+ 0: Minimum objective value: -26.0947723389
+ 0: Total Execution time: 13087.3101428 seconds
+
+[quality_CH4]
+ 0: Minimum objective value: -39.7705345154
+ 0: Total Execution time: 121674.749651 seconds

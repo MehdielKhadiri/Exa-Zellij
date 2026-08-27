@@ -1,0 +1,4 @@
+# Keep reproducibility hashes and Linux launchers stable across platforms.
+reproducibility/** text eol=lf
+*.sh text eol=lf
+*.sbatch text eol=lf

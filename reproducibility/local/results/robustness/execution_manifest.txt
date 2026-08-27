@@ -1,0 +1,9 @@
+protocol=PFDA-BS-hyperparameter-robustness-v1
+execution=local-single-GPU
+started_at=2026-08-09T19:28:40+02:00
+host=<local-workstation>
+gpu=NVIDIA GeForce RTX 3050 Laptop GPU
+python=<conda-environment>/bin/python
+molecules=HeH+ H3+ H4
+seeds=0 1 2 3 4
+result_root=<workspace>/results/vqe_pfda_robustness_local_rtx3050_v1

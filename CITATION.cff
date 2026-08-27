@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software or its reproducibility material, please cite the software release and the associated PFDA-BS VQE article."
+title: "Fractal Quantum Optimizer"
+type: software
+authors:
+  - family-names: "El-Khadiri"
+    given-names: "Mahmoud El-Mehdi"
+repository-code: "https://github.com/MehdielKhadiri/fractal-quantum-optimizer"
+license: "CECILL-C"
+version: "0.2.0"
+date-released: "2026-08-27"
+keywords:
+  - fractal-based decomposition
+  - fractal Bayesian optimization
+  - variational quantum eigensolver
+  - MPI
+  - Kokkos
+  - reproducibility

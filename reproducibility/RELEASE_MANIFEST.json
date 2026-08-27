@@ -1,0 +1,43 @@
+{
+  "bundle_version": "0.2.0",
+  "assembled_on": "2026-08-27",
+  "code_license": "CeCILL-C-1.0",
+  "platforms": {
+    "grid5000_nantes_ecotaxe": {
+      "accelerator": "NVIDIA A100 80 GiB",
+      "included_evidence": [
+        "black-box equal-call run-level and aggregate CSV files",
+        "knowledge-driven retained aggregate CSV files",
+        "OAR launch, staging, worker, and analysis code"
+      ]
+    },
+    "local_robustness": {
+      "accelerator": "NVIDIA GeForce RTX 3050 Laptop GPU",
+      "included_evidence": [
+        "195 run-level measurements",
+        "12 paired one-factor effects",
+        "protocol and sanitized execution manifest"
+      ]
+    },
+    "lumi_g": {
+      "accelerator": "AMD MI250X GPU compute dies",
+      "included_evidence": [
+        "SLURM rerun material",
+        "hash-indexed recovered-log evidence and verbatim result excerpts",
+        "strong-scaling coordinates with per-point provenance",
+        "nine-molecule solution-quality table with per-row provenance"
+      ],
+      "missing_evidence": [
+        "source logs for the 10-to-100-node scaling pair",
+        "internal run log for the maxiter=100 1,000-node endpoint",
+        "source logs for three of the nine solution-quality rows"
+      ]
+    }
+  },
+  "verification_command": "python reproducibility/verify_results.py",
+  "notes": [
+    "Personal filesystem identities were removed from retained manifests.",
+    "Grid'5000 job identifiers and cluster hostnames were retained as execution provenance.",
+    "No credentials, access tokens, scheduler accounts, container images, or home-directory backup are distributed."
+  ]
+}

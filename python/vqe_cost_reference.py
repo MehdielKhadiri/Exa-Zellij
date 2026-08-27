@@ -39,7 +39,10 @@ def load_molecule(molname: str, basis: str):
 
     if offline:
         root = Path(os.environ.get("XDG_CACHE_HOME", Path.home()))
-        qroot = root / "datasets" / "qchem"
+        qroots = [
+            root / "datasets" / "qchem",
+            root / "pennylane" / "datasets" / "qchem",
+        ]
 
         # --- exact map (use raw strings for any '\a' sequences) ---
         exact = {
@@ -48,19 +51,36 @@ def load_molecule(molname: str, basis: str):
             ("H4",   "STO-3G"): r"h4-molecule-h4-sto-3g-0.88-∡ hhh = 180°-8.h5",
             ("H5",   "STO-3G"): r"h5-molecule-h5-sto-3g-1.0-∡ hhh = 180°-10.h5",
             ("H6",   "STO-3G"): r"h6-molecule-h6-sto-3g-0.92-∡ hhh = 180°-12.h5",
+            ("OH-",  "STO-3G"): r"oh-anion-oh--sto-3g-0.964-n\a-12.h5",
+            ("NeH+", "STO-3G"): r"neh-cation-neh+-sto-3g-0.991-n\a-12.h5",
+            ("HF",   "STO-3G"): r"hf-molecule-hf-sto-3g-0.917-n\a-12.h5",
+            ("LiH",  "STO-3G"): r"lih-molecule-lih-sto-3g-1.57-n\a-12.h5",
         }
 
         fname = exact.get((molname, basis))
-        path = (qroot / fname) if fname else None
+        path = None
+        if fname:
+            path = next((candidate / fname for candidate in qroots if (candidate / fname).exists()), None)
 
-        # If not mapped or missing, try robust discovery (handles BEL vs '\a')
+        # If not mapped or missing, use normalized recursive discovery.  Recent
+        # PennyLane versions use ``pennylane/datasets/qchem`` while older
+        # versions use ``datasets/qchem``.
         if path is None or not path.exists():
-            patt = f"{molname.lower()}*-{basis.lower()}-*.h5"
-            cands = sorted(Path(p) for p in glob.glob(str(qroot / patt)))
-            # Prefer the one ending with '-20.h5' (Li2 has 20 qubits)
-            cands = [p for p in cands if p.name.endswith("-20.h5")] or cands
+            normalize = lambda value: "".join(ch for ch in value.lower() if ch.isalnum())
+            mol_key = normalize(molname)
+            basis_key = normalize(basis)
+            cands = sorted(
+                candidate
+                for qroot in qroots
+                for candidate in qroot.rglob("*.h5")
+                if mol_key in normalize(str(candidate))
+                and basis_key in normalize(str(candidate))
+            )
             if not cands:
-                raise FileNotFoundError(f"No local HDF5 found for {molname}/{basis} under {qroot}")
+                searched = ", ".join(str(qroot) for qroot in qroots)
+                raise FileNotFoundError(
+                    f"No local HDF5 found for {molname}/{basis} under {searched}"
+                )
             path = cands[0]
 
         # Last-resort swap: if user typed literal '\a', try BEL variant and vice versa
@@ -79,11 +99,15 @@ def load_molecule(molname: str, basis: str):
         return mol, efi
 
     # ---------- Online (small scale) ----------
+    download_root = Path(
+        os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
+    ) / "datasets"
     data = qml.data.load(
         "qchem",
         molname=molname,
         basis=basis,
         attributes=["molecule", "fci_energy"],
+        folder_path=str(download_root),
     )[-1]
     return data.molecule, float(data.fci_energy)
 
@@ -94,9 +118,10 @@ def load_molecule(molname: str, basis: str):
 
 def build_qubit_hamiltonian(mol: qml.qchem.Molecule):
     """Jordan–Wigner qubit Hamiltonian for this Molecule (fixed geometry)."""
+    method = "openfermion" if int(mol.n_electrons) % 2 else "pyscf"
     H, n_qubits = qml.qchem.molecular_hamiltonian(
         mol,
-        method="pyscf",            # robust on Linux/macOS; use "openfermion" if you have that stack
+        method=method,
         mapping="jordan_wigner",
     )
     return H, n_qubits

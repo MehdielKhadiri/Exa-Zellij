@@ -1,0 +1,20 @@
+protocol=PFDA-BS-VQE-canonical-count-v2
+job_id=334870
+started_at=2026-08-10T17:20:59+02:00
+hosts=ecotaxe-1.nantes.grid5000.fr
+molecules=HeH+ H3+ H4 OH- HF NeH+ H5 LiH H6
+methods=pfda-bs cobyla l-bfgs-b spsa pso sobol
+seeds=0 1 2 3 4
+pfda_seed=0 (deterministic path); baseline_seeds=0 1 2 3 4
+pfda_depth=2
+pfda_beam_width=2
+pfda_samples_per_child=3
+pfda_ils_iterations=1
+pfda_global_budget=20000
+pfda_ils_contraction=0.95
+pfda_sampling_strategy=promising-hypersphere
+pfda_phs_inflation=1.75
+pfda_scoring=minimum objective value over the three PHS probes
+budget_target=20000
+comparison_rule=comparator cap equals the largest native PFDA-BS structural count not exceeding the global cap
+result_root=$HOME/fractal-quantum-optimizer/results/vqe_pfda_equal_count_beam2_all_molecules_b20k_v1

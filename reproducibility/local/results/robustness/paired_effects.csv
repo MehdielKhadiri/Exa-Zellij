@@ -1,0 +1,13 @@
+variant,factor,level,reference_variant,paired_conditions,median_delta_log10_error,median_error_ratio,better,ties,worse
+depth_1,maximum depth,1,default,15,-0.33743943713411784,0.4597911024593828,15,0,0
+depth_3,maximum depth,3,default,15,0.0,1.0,5,5,5
+beam_25,beam width,25,default,15,0.0,1.0,5,10,0
+beam_200,beam width,200,default,15,0.0,1.0,0,15,0
+samples_2,samples per region,2,default,15,0.0,1.0,5,5,5
+samples_4,samples per region,4,default,15,0.0,1.0,5,5,5
+ils_0,local-search iterations,0,default,15,0.0,1.0,0,10,5
+ils_2,local-search iterations,2,default,15,0.0,1.0,0,15,0
+sampling_uniform,sampling strategy,uniform hypersphere,default,15,-0.004667303476727502,0.9893106778128924,8,0,7
+sampling_sobol,sampling strategy,scrambled Sobol hypersphere,default,15,0.0,1.0,7,5,3
+contraction_05,ILS contraction,0.5 at two iterations,ils_2,15,0.0,1.0,0,15,0
+contraction_095,ILS contraction,0.95 at two iterations,ils_2,15,0.0,1.0,0,15,0

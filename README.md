@@ -7,7 +7,7 @@ A configurable MPI/Kokkos implementation of:
 - **Fractal Bayesian Optimization (FBO)**, where a surrogate and acquisition
   function guide the fractal search under a fixed objective-evaluation budget.
 
-The repository also contains the hybrid VQE path exercised on LUMI-G:
+The repository also contains the hybrid VQE path exercised on Grid'5000 and LUMI-G:
 the compiled optimizer calls a batched PennyLane/JAX objective through an
 embedded Python interface, while MPI distributes independent fractal work and
 Kokkos targets NVIDIA CUDA or AMD HIP accelerators.
@@ -25,6 +25,9 @@ Kokkos targets NVIDIA CUDA or AMD HIP accelerators.
    configuration, result, and timing of each run.
 5. The same optimizer can be smoke-tested without quantum dependencies on the
    included analytic objectives.
+6. The reproducibility bundle includes the Grid'5000 sequential comparison and
+   robustness drivers, curated run-level results, LUMI-G paper coordinates,
+   scheduler launchers, and a dependency-free claim verifier.
 
 The present VQE backend is a PennyLane/JAX simulator path. It is a feasibility
 implementation for hybrid HPC–quantum workflows, not a claim that a GPU
@@ -42,9 +45,25 @@ the same `init`, `eval`, and `eval_batch` Python interface described in
 ├── data/                    Portable LiH/STO-3G Pauli-term reference
 ├── examples/                Small FBD, FBO, and VQE launch examples
 ├── scripts/lumi/            LUMI-G build/run material
+├── reproducibility/         Grid'5000/LUMI protocols, results, and verifier
 ├── docs/                    Configuration and hybrid-interface documentation
 └── tests/                   Dependency-light release integrity checks
 ```
+
+## Verify the published result artifacts
+
+No accelerator or quantum dependencies are required to check the retained
+measurements and recompute the central paper-facing outcomes:
+
+```bash
+python reproducibility/verify_results.py
+```
+
+The verifier checks file hashes, reconstructs the equal-call and
+knowledge-driven win/tie/loss counts, validates all 195 robustness runs, and
+recomputes the LUMI-G scaling and solution-quality quantities.  Full provenance
+and rerun instructions are in
+[`reproducibility/README.md`](reproducibility/README.md).
 
 ## Build
 
@@ -138,6 +157,8 @@ The placeholder dimension `1` is replaced at runtime by the UCCSD parameter
 count returned by the VQE evaluator. The first online run may download
 PennyLane quantum-chemistry data and compile JAX kernels.
 
+For Grid'5000, use
+[`reproducibility/grid5000/README.md`](reproducibility/grid5000/README.md).
 For LUMI-G, use [docs/lumi-g.md](docs/lumi-g.md) and
 [`scripts/lumi/vqe_sweep.sbatch`](scripts/lumi/vqe_sweep.sbatch).
 
@@ -150,8 +171,11 @@ The complete runtime component matrix is documented in
 ## Research status
 
 This is a research release assembled from the implementation used for the
-configurable FBD/FBO and LUMI-G VQE experiments. It favors traceable runtime
-configuration and reproducible launch material over a stable library API.
+configurable FBD/FBO and Grid'5000/LUMI-G VQE experiments. It favors traceable
+runtime configuration and reproducible launch material over a stable library
+API.  Result files are labeled by provenance: retained run-level output,
+hash-indexed raw-log evidence, aggregate output, or paper-derived values where
+the recovered scheduler backup does not contain the corresponding source log.
 
 ## License
 

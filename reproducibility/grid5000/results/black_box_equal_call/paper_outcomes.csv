@@ -1,0 +1,7 @@
+comparator,cases,pfda_wins,ties,pfda_losses
+cobyla,8,5,3,0
+l-bfgs-b,8,0,7,1
+spsa,8,8,0,0
+pso,8,4,4,0
+sobol,8,8,0,0
+total,40,25,14,1

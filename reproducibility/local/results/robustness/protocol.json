@@ -1,0 +1,183 @@
+{
+  "comparison": {
+    "fixed_call": "All configurations are also compared at the smallest native count for each molecule.",
+    "geometry": "Canonical hyperspheres are held fixed because geometry defines the PFDA-BS algorithm rather than a tunable hyperparameter.",
+    "native_final": "Each structural configuration runs to its native call count."
+  },
+  "dimensions": {
+    "H3+": 8,
+    "H4": 26,
+    "HeH+": 3
+  },
+  "molecules": [
+    "HeH+",
+    "H3+",
+    "H4"
+  ],
+  "protocol": "PFDA-BS-hyperparameter-robustness-v1",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "variants": [
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "reference",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "D=2, beta=100, m=1, maxiter=1",
+      "name": "default",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 1,
+      "factor": "maximum depth",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "1",
+      "name": "depth_1",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 3,
+      "factor": "maximum depth",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "3",
+      "name": "depth_3",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 25,
+      "depth": 2,
+      "factor": "beam width",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "25",
+      "name": "beam_25",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 200,
+      "depth": 2,
+      "factor": "beam width",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "200",
+      "name": "beam_200",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "samples per region",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "2",
+      "name": "samples_2",
+      "reference": "default",
+      "samples_per_child": 2,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "samples per region",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "4",
+      "name": "samples_4",
+      "reference": "default",
+      "samples_per_child": 4,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "local-search iterations",
+      "ils_contraction": 0.8,
+      "ils_iterations": 0,
+      "level": "0",
+      "name": "ils_0",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "local-search iterations",
+      "ils_contraction": 0.8,
+      "ils_iterations": 2,
+      "level": "2",
+      "name": "ils_2",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "sampling strategy",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "uniform hypersphere",
+      "name": "sampling_uniform",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "uniform-ball"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "sampling strategy",
+      "ils_contraction": 0.8,
+      "ils_iterations": 1,
+      "level": "scrambled Sobol hypersphere",
+      "name": "sampling_sobol",
+      "reference": "default",
+      "samples_per_child": 1,
+      "sampling_strategy": "sobol-ball"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "ILS contraction",
+      "ils_contraction": 0.5,
+      "ils_iterations": 2,
+      "level": "0.5 at two iterations",
+      "name": "contraction_05",
+      "reference": "ils_2",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    },
+    {
+      "beam_width": 100,
+      "depth": 2,
+      "factor": "ILS contraction",
+      "ils_contraction": 0.95,
+      "ils_iterations": 2,
+      "level": "0.95 at two iterations",
+      "name": "contraction_095",
+      "reference": "ils_2",
+      "samples_per_child": 1,
+      "sampling_strategy": "center-symmetric"
+    }
+  ]
+}

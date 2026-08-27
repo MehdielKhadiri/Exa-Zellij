@@ -17,9 +17,38 @@ def require(path: str) -> Path:
 
 
 def test_python_syntax() -> None:
-    for relative in ("python/vqe_bridge.py", "python/vqe_cost_reference.py"):
+    for relative in (
+        "python/vqe_bridge.py",
+        "python/vqe_cost_reference.py",
+        "reproducibility/verify_results.py",
+        "reproducibility/grid5000/code/run_vqe_pfda_equal_count.py",
+        "reproducibility/grid5000/code/analyze_vqe_pfda_equal_count.py",
+        "reproducibility/grid5000/code/run_vqe_quantum_aware.py",
+        "reproducibility/grid5000/code/analyze_vqe_quantum_aware.py",
+        "reproducibility/grid5000/code/vqe_pfda_robustness_protocol.py",
+        "reproducibility/grid5000/code/analyze_vqe_pfda_robustness.py",
+        "reproducibility/grid5000/code/run_vqe_large_statevector_checkpointed.py",
+    ):
         path = require(relative)
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
+def test_reproducibility_assets() -> None:
+    required = (
+        "reproducibility/README.md",
+        "reproducibility/SHA256SUMS",
+        "reproducibility/grid5000/README.md",
+        "reproducibility/grid5000/results/black_box_equal_call/runs_long.csv",
+        "reproducibility/grid5000/results/knowledge_driven/paper_final_errors.csv",
+        "reproducibility/local/results/robustness/runs.csv",
+        "reproducibility/lumi_g/README.md",
+        "reproducibility/lumi_g/raw_evidence/raw_log_evidence.csv",
+        "reproducibility/lumi_g/raw_evidence/log_excerpts.txt",
+        "reproducibility/lumi_g/results/strong_scaling.csv",
+        "reproducibility/lumi_g/results/solution_quality.csv",
+    )
+    for relative in required:
+        require(relative)
 
 
 def test_pauli_reference() -> None:
@@ -60,12 +89,13 @@ def test_component_switches_are_present() -> None:
 def test_no_site_identity_or_credentials() -> None:
     text_extensions = {
         ".cpp", ".hpp", ".py", ".md", ".txt", ".yml", ".yaml",
-        ".sh", ".sbatch", ".cmake",
+        ".sh", ".sbatch", ".cmake", ".csv", ".json", ".cff",
     }
     forbidden = (
         re.compile(r"project_\d+"),
         re.compile(r"/home/[A-Za-z0-9._-]+"),
         re.compile(r"/users/[A-Za-z0-9._-]+"),
+        re.compile(r"[A-Za-z]:\\Users\\[A-Za-z0-9._-]+"),
         re.compile(r"BEGIN (?:RSA |OPENSSH )?PRIVATE KEY"),
         re.compile(r"(?i)(?:api[_-]?key|token|password)\s*[:=]\s*[\"'][^\"']+"),
     )
@@ -91,5 +121,6 @@ if __name__ == "__main__":
     test_python_syntax()
     test_pauli_reference()
     test_component_switches_are_present()
+    test_reproducibility_assets()
     test_no_site_identity_or_credentials()
     print("release asset checks: OK")

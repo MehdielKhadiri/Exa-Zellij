@@ -1,0 +1,3 @@
+search_space,all_wins,all_ties,all_losses,work20k_wins,work20k_ties,work20k_losses,hf_error_20k_ha
+dimension_normalized,21,30,3,4,14,0,6.652e-3
+periodic_pi,21,20,13,4,8,6,2.468e-6
