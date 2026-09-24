@@ -3,7 +3,7 @@ requires = ["scikit-build-core>=0.10,<2"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "fractal-quantum-optimizer"
+name = "fractal-based-optimizers"
 version = "0.3.0.dev0"
 description = "Configurable compiled FBD and FBO optimization with optional HPC and quantum adapters"
 readme = "README.md"

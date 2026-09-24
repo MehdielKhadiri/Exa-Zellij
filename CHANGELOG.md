@@ -2,6 +2,10 @@
 
 ## 0.3.0 — in development
 
+- Renamed the project and source distribution to Fractal-Based Optimizers
+  (`fractal-based-optimizers`). Existing `fqo` imports/CLI, `FQO_*` options,
+  and the native executable name are unchanged. VQE remains optional.
+
 - Added an optional CPU solver backend and single-process execution without MPI.
 - Added a Python callable/batch/executable interface and editable JSON runs.
 - Kept FBD structurally controlled; FBO accepts an evaluation budget.

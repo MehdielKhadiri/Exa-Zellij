@@ -1,10 +1,25 @@
-# Installation and use
+# Fractal-Based Optimizers: installation and use
 
 This is the developing 0.3 interface. Platform validation is recorded separately
 in `docs/validation.md`; a build recipe is not a promise that every platform has
 been tested. The research data and previous launch commands remain available.
 
 ## Install on Linux or WSL
+
+The source distribution is named `fractal-based-optimizers`. The Python module
+and command remain `fqo`; this rename does not change objective or component
+APIs. Installation below is from this checkout, not a claim that this development
+version has been published to PyPI. The GitHub repository URL retains its old name.
+
+When upgrading an environment containing the old distribution, remove it first
+because both distributions install the same `fqo` module:
+
+```sh
+python -m pip uninstall fractal-quantum-optimizer
+python -m pip install .
+```
+
+Skip the uninstall for a new environment. Existing scripts keep their imports.
 
 Linux is the supported operating system. On a Windows PC, run the commands
 inside Ubuntu/WSL; native Windows is outside the supported scope.
@@ -138,6 +153,13 @@ a custom build when using the Python driver. Pipe callbacks are single-rank;
 distributed objectives use the embedded module adapter below.
 
 ## External objectives on MPI ranks
+
+Selecting a CUDA/HIP optimizer does not automatically move a Python callback or
+external program onto the GPU. Built-in native objectives use the compiled
+backend; user objectives execute wherever their own implementation places the
+work. A Python GPU objective must initialize its own compatible GPU runtime on
+each rank. The single-process Python API and executable adapter require no
+embedded-Python build; the module adapter below does.
 
 Build with Python embedding enabled and make NumPy available to that interpreter.
 Your module defines `evaluate(x)` and optionally `evaluate_batch(rows)` and

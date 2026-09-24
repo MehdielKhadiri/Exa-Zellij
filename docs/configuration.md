@@ -20,7 +20,7 @@ Common options:
 
 | Option | Meaning |
 |---|---|
-| `--optimizer-family fbd|fbo` | Select the optimizer family |
+| `--optimizer-family fbd\|fbo` | Select the optimizer family |
 | `--rho R` | Acquisition-mass coverage used by FBO tree selection |
 | `--n-init N` | Override initial-design size |
 | `--max-depth H` | Maximum fractal-tree depth |
@@ -48,6 +48,28 @@ Additional controls include `--fbd-points-per-cell`,
 `--fbd-initial-points`, `--fbd-beam-width`, `--fbd-epsilon`,
 `--fbd-hypercube-active-dims`, `--fbd-voronoi-sites`, and
 `--fbd-simplex-children`.
+
+### Branching and beam width
+
+The current hypersphere generator creates `2*d` children per parent. Defaults
+for simplex-lite (`simplex`) and Voronoi-style (`voronoi`) are `d+1` and `2*d+1`.
+These two implementations use a center plus positive coordinate offsets or
+signed coordinate offsets, respectively; they are not arbitrary geometric
+simplex/Voronoi tessellations. Smaller requested child counts restrict the
+covered coordinate directions. Counts above those defaults repeat generated
+children rather than introducing new directions. Distinct children of one
+parent do not guarantee non-overlapping regions across parents.
+
+`--fbd-beam-width` caps retained cells; it does not set branching or guarantee
+a full beam at every level. Larger branching, beams, probe counts, and local
+exploitation increase work and can change solution quality. Report actual
+evaluations as well as runtime when comparing them.
+
+For MPI comparisons, explicitly select `--fbo-doe-distribution distributed`
+even with FBD if `--n-init` is intended as a global initial-design size. The
+default replicated mode performs the design on every rank and increases work
+with rank count. Record the actual counts to expose any remaining replicated
+per-rank work.
 
 ## FBO components
 

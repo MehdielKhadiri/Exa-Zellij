@@ -2,6 +2,9 @@
 
 | Path | Purpose |
 |---|---|
+| `QUICKSTART.txt` | Linux/WSL installation and first objective |
+| `python/fqo/` | Public Python API, JSON CLI, executable-objective adapter and lazy VQE addon |
+| `configure.py` | CPU/CUDA/HIP build selection and explicit HPC target overrides |
 | `src/main.cpp` | Optimizer driver, distributed DOE, fractal tree, acquisition selection, exploitation, and checkpointing |
 | `include/FBOTypes.hpp` | Shared decomposition, DOE, surrogate, kernel, exploitation, and budget enums |
 | `src/FBOConfig.cpp` | Runtime parsing and validation of FBO components |
@@ -15,3 +18,6 @@
 | `scripts/lumi/` | LUMI-G build and Slurm launch material |
 | `examples/` | Minimal component selections |
 | `tests/test_release_assets.py` | Syntax, data, and accidental-secret checks |
+| `tests/test_api.py` | User callbacks, components, bounds and error handling |
+| `tests/test_mpi.py` | Distributed native/embedded-objective checks |
+| `docs/validation.md` | Observed platform validation and outstanding release gates |

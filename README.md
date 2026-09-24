@@ -1,12 +1,22 @@
-# Fractal Quantum Optimizer
+# Fractal-Based Optimizers
 
-A configurable C++/Kokkos implementation, with a Python interface and optional
-MPI, NVIDIA CUDA, AMD HIP and VQE support, of:
+A configurable optimization core in C++/Kokkos, with a Python interface, for:
 
 - **Fractal-Based Decomposition (FBD)**, where decomposition, exploration,
   scoring, tree search, and exploitation are selected independently; and
 - **Fractal Bayesian Optimization (FBO)**, where a surrogate and acquisition
   function guide the fractal search under a fixed objective-evaluation budget.
+
+Use your own objective function, select a family and its components, and run on
+Linux or WSL. MPI, NVIDIA CUDA, AMD HIP, and the VQE quantum-chemistry objective
+are optional. **Quantum simulation is an addon, not a requirement of either
+optimizer family.**
+
+The project was previously called Fractal Quantum Optimizer. The source package
+is now named `fractal-based-optimizers`; existing `from fqo import ...`, the
+`fqo` command, `FQO_*` build options, and the `fractal_optimizer` executable
+remain compatible. The GitHub URL and historical release environments still
+use the old name. See the [installation guide](docs/user-guide.md) for upgrades.
 
 ## Start on Linux or WSL
 
@@ -49,6 +59,8 @@ Use [JUPITER](docs/jupiter.md) or [LUMI-G](docs/lumi-g.md) instructions on those
 systems. See [validation status](docs/validation.md) before relying on a platform;
 source installation and tested/published binary wheels are distinct.
 
+## Optional VQE objective and research bundle
+
 The repository also contains the hybrid VQE path exercised on Grid'5000 and LUMI-G:
 the compiled optimizer calls a batched PennyLane/JAX objective through an
 embedded Python interface, while MPI distributes independent fractal work and
@@ -60,16 +72,14 @@ Kokkos targets NVIDIA CUDA or AMD HIP accelerators.
    `--optimizer-family fbd|fbo`.
 2. FBD and FBO components are configurable at runtime through command-line
    options, and the effective configuration is printed at startup.
-3. `--objective vqe` activates the compiled C++/Python bridge, obtains the
-   UCCSD parameter count from the chosen molecule, and uses batched objective
-   calls.
-4. The LUMI-G script maps one MPI rank to one MI250X GCD and records the
-   configuration, result, and timing of each run.
-5. The same optimizer can be smoke-tested without quantum dependencies on the
-   included analytic objectives.
-6. The reproducibility bundle includes the Grid'5000 sequential comparison and
-   robustness drivers, curated run-level results, LUMI-G paper coordinates,
-   scheduler launchers, and a dependency-free claim verifier.
+3. User objectives can be Python scalar/batch callbacks, executable adapters,
+   embedded MPI Python modules, or compiled native functions.
+4. The default CPU install has no MPI or quantum dependencies; site-specific
+   CUDA/HIP builds support GPU execution and optional MPI distribution.
+5. Python and JSON interfaces expose bounds, family configuration, seeds,
+   result coordinates, objective values, and evaluation counts.
+6. VQE is an optional objective adapter. Its simulator environments and
+   Grid'5000/LUMI reproducibility bundle are retained separately from core use.
 
 The present VQE backend is a PennyLane/JAX simulator path. It is a feasibility
 implementation for hybrid HPC–quantum workflows, not a claim that a GPU
@@ -83,7 +93,8 @@ the same `init`, `eval`, and `eval_batch` Python interface described in
 .
 ├── include/                 Public C++ headers and runtime configuration
 ├── src/                     MPI/Kokkos FBD/FBO implementation and VQE shim
-├── python/                  PennyLane/JAX VQE evaluator
+├── python/fqo/              Python API, CLI, and lazy VQE addon
+├── python/vqe_*.py          Optional PennyLane/JAX VQE evaluator
 ├── data/                    Portable LiH/STO-3G Pauli-term reference
 ├── examples/                Small FBD, FBO, and VQE launch examples
 ├── scripts/lumi/            LUMI-G build/run material
@@ -112,9 +123,9 @@ and rerun instructions are in
 Requirements:
 
 - CMake 3.20 or newer and a C++20 compiler;
-- MPI;
+- MPI when distributed execution is enabled;
 - a CUDA- or HIP-enabled Kokkos and Kokkos Kernels installation;
-- pybind11 2.12 or newer;
+- pybind11 only when enabling the embedded Python objective adapter;
 - CUDA Toolkit for NVIDIA builds, or rocBLAS/rocSOLVER for AMD builds.
 
 CUDA:
@@ -123,8 +134,8 @@ CUDA:
 cmake -S . -B build-cuda -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_COMPILER=nvcc_wrapper \
-  -DFQO_GPU_BACKEND=CUDA -DFQO_ENABLE_MPI=ON -DFQO_ENABLE_PYTHON=ON \
-  -DCMAKE_PREFIX_PATH="/path/to/kokkos;/path/to/kokkos-kernels;/path/to/pybind11"
+  -DFQO_GPU_BACKEND=CUDA -DFQO_ENABLE_MPI=ON -DFQO_ENABLE_PYTHON=OFF \
+  -DCMAKE_PREFIX_PATH="/path/to/kokkos;/path/to/kokkos-kernels"
 cmake --build build-cuda --parallel 4
 ctest --test-dir build-cuda --output-on-failure
 ```
@@ -135,11 +146,16 @@ HIP:
 cmake -S . -B build-hip -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_COMPILER=hipcc \
-  -DFQO_GPU_BACKEND=HIP -DFQO_ENABLE_MPI=ON -DFQO_ENABLE_PYTHON=ON \
-  -DCMAKE_PREFIX_PATH="/path/to/kokkos;/path/to/kokkos-kernels;/path/to/pybind11"
+  -DFQO_GPU_BACKEND=HIP -DFQO_ENABLE_MPI=ON -DFQO_ENABLE_PYTHON=OFF \
+  -DCMAKE_PREFIX_PATH="/path/to/kokkos;/path/to/kokkos-kernels"
 cmake --build build-hip --parallel 4
 ctest --test-dir build-hip --output-on-failure
 ```
+
+For embedded Python objectives or the native VQE example below, rebuild with
+`-DFQO_ENABLE_PYTHON=ON` and add your pybind11 installation to
+`CMAKE_PREFIX_PATH`. This is separate from the ordinary Python API, which
+does not need Python embedding. See the [objective adapter guide](docs/user-guide.md#external-objectives-on-mpi-ranks).
 
 The optional HSIC-GP surrogate requires Uranie/ROOT and
 `-DFQO_ENABLE_URANIE=ON`. The default PCA-GP and the remaining FBD/FBO

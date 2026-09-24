@@ -1,8 +1,11 @@
-FBD / FBO — QUICK START
-======================
+FRACTAL-BASED OPTIMIZERS — QUICK START
+====================================
 
 Run these commands from the repository folder containing pyproject.toml.
 This guide describes the developing 0.3 interface, not the older public tag.
+The Python import and command remain fqo. VQE is an optional objective addon.
+For an existing installation under the old distribution name, see the upgrade
+instructions in docs/user-guide.md before installing the renamed package.
 
 1. INSTALL ON LINUX OR WSL (CPU)
 

@@ -22,5 +22,7 @@ executable, an exit code and (on success) `PASS.txt` are saved under
 `results/grid5000-hip-JOB_ID`. A submitted job or a successful compile alone is
 not a completed runtime validation; check `PASS.txt` and the test logs.
 
-The initial validation job for this recipe is queued. See `validation.md` for
-the measured platform status.
+The initial job, 334968, exited during setup on 2026-09-21 before building or
+running tests. Its stderr reports a missing user `.bashrc`; no `PASS.txt` was
+produced. The recipe is not yet a successful AMD validation. See
+[validation.md](validation.md) for the measured status.
