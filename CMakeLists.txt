@@ -159,7 +159,10 @@ if(BUILD_TESTING)
     add_test(NAME python_api COMMAND "${CMAKE_COMMAND}" -E env
       "FQO_EXECUTABLE=$<TARGET_FILE:fractal_optimizer>"
       "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_api.py")
-    set_tests_properties(python_api PROPERTIES TIMEOUT 180)
+      set_tests_properties(python_api PROPERTIES TIMEOUT 180)
+      add_test(NAME native_objectives COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_native_objectives.py"
+        --executable "$<TARGET_FILE:fractal_optimizer>")
     if(FQO_ENABLE_MPI)
       set(_fqo_mpi_test_python)
       if(FQO_ENABLE_PYTHON)
@@ -171,6 +174,11 @@ if(BUILD_TESTING)
         --mpiexec "${MPIEXEC_EXECUTABLE}" "--numproc-flag=${MPIEXEC_NUMPROC_FLAG}"
         ${_fqo_mpi_test_python})
       set_tests_properties(mpi_objectives PROPERTIES TIMEOUT 240)
+      add_test(NAME mpi_budget COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_mpi_budget.py"
+        --executable "$<TARGET_FILE:fractal_optimizer>"
+        --mpiexec "${MPIEXEC_EXECUTABLE}" "--numproc-flag=${MPIEXEC_NUMPROC_FLAG}")
+      set_tests_properties(mpi_budget PROPERTIES TIMEOUT 240)
     endif()
   endif()
 endif()

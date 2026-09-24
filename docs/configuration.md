@@ -11,7 +11,8 @@ fractal_optimizer <beam_cap> <dimension> <budget> <expense_factor> <objective>
 
 `beam_cap` limits the retained active set. `dimension` is ignored for VQE after
 the Python evaluator reports the ansatz parameter count. `budget` is the global
-objective-evaluation budget. `expense_factor` repeats arithmetic only for the
+objective-evaluation budget for FBO; FBD ignores this legacy positional token
+and determines its work from its structural configuration. `expense_factor` repeats arithmetic only for the
 included analytic objectives. `objective` can also be supplied with
 `--objective`.
 
@@ -74,6 +75,14 @@ Fixed-fraction budgeting uses `--doe-frac`, `--explore-frac`, and
 `--fbo-gp-sigma-f`, `--fbo-gp-length-scale`, `--fbo-gp-noise`,
 `--fbo-gp-rq-alpha`, `--fbo-exploit-starts`,
 `--fbo-exploit-local-iters`, and `--fbo-exploit-radius-scale`.
+
+For a fresh CLI/MPI FBO run, the global cap counts actual evaluations across
+all ranks, including each rank's initial-center evaluation and any replicated
+DOE calls. Phase fractions are nominal allocations: exploration must fit the
+remainder after initialization, and exploitation is limited by the actual
+remaining budget. Local-search starts and coordinate proposals count toward
+that limit. A run may finish below its cap. If initialization leaves no search
+budget, reduce `--n-init`, use distributed DOE, or increase the cap.
 
 ## VQE objective
 

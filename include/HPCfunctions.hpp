@@ -8,6 +8,7 @@
 #include "FBOTypes.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <iosfwd>
@@ -40,7 +41,9 @@ enum class ObjectiveType {
     Discus,
     SharpRidge,
     DifferentPowers,
-    External
+    External,
+    ShiftedEllipsoid,
+    ShiftedRastrigin
 };
 
 inline bool usesExternalObjective(ObjectiveType objType)
@@ -54,6 +57,8 @@ inline bool usesAdditiveDeviceObjective(ObjectiveType objType)
         case ObjectiveType::Sphere:
         case ObjectiveType::Rastrigin:
         case ObjectiveType::Ellipsoid:
+        case ObjectiveType::ShiftedEllipsoid:
+        case ObjectiveType::ShiftedRastrigin:
         case ObjectiveType::Levy:
         case ObjectiveType::Multimodal:
         case ObjectiveType::ShiftedSphere:
@@ -102,6 +107,27 @@ inline ExternalObjective& globalExternalObjective()
 {
     static ExternalObjective g;
     return g;
+}
+
+// Host-side launch accounting: one point evaluation includes an evaluation
+// reconstructed from cached additive terms. Coordinate-search proposals are
+// counted as point evaluations even when only their changed term is computed.
+struct ObjectiveEvaluationAudit {
+    std::atomic<long long> device{0};
+    std::atomic<long long> host{0};
+};
+inline ObjectiveEvaluationAudit& objectiveEvaluationAudit() {
+    static ObjectiveEvaluationAudit audit;
+    return audit;
+}
+inline void recordObjectiveEvaluations(long long count, bool device) {
+    (device ? objectiveEvaluationAudit().device : objectiveEvaluationAudit().host)
+        .fetch_add(count, std::memory_order_relaxed);
+}
+
+KOKKOS_INLINE_FUNCTION
+double qualityObjectiveShift(int dim) {
+    return 0.35 + 0.9 * static_cast<double>((dim * 37 + 11) % 101) / 100.0;
 }
 
 using HypersphereID = std::vector<std::pair<int, int>>;
@@ -556,6 +582,8 @@ double objectiveTerm(ObjectiveType objType, double xi, int dim, int D, int expen
         case ObjectiveType::Sphere:        return computeSphereTerm(xi, expenseFactor);
         case ObjectiveType::Rastrigin:     return computeRastriginTerm(xi, expenseFactor);
         case ObjectiveType::Ellipsoid:     return computeEllipsoidTerm(xi, dim, D, expenseFactor);
+        case ObjectiveType::ShiftedEllipsoid: return computeEllipsoidTerm(xi - qualityObjectiveShift(dim), dim, D, expenseFactor);
+        case ObjectiveType::ShiftedRastrigin: return computeRastriginTerm(xi - qualityObjectiveShift(dim), expenseFactor);
         case ObjectiveType::Levy:          return computeLevyTerm(xi, dim, D, expenseFactor);
         case ObjectiveType::Multimodal:    return computeMultiModalTerm(xi, expenseFactor);
         case ObjectiveType::ShiftedSphere: return computeShiftedSphereTerm(xi, expenseFactor);
@@ -598,6 +626,12 @@ template<typename View1D>
 KOKKOS_INLINE_FUNCTION
 double computeBuiltInObjective(const View1D& x, int expenseFactor, ObjectiveType objType)
 {
+    if (objType == ObjectiveType::ShiftedEllipsoid || objType == ObjectiveType::ShiftedRastrigin) {
+        const int d = static_cast<int>(x.extent(0));
+        double sum = 0.0;
+        for (int j = 0; j < d; ++j) sum += objectiveTerm(objType, x(j), j, d, expenseFactor);
+        return sum;
+    }
     switch (objType) {
         case ObjectiveType::Sphere:        return sphereObjectiveFunction(x, expenseFactor);
         case ObjectiveType::Rastrigin:     return rastriginObjectiveFunction(x, expenseFactor);
@@ -749,6 +783,7 @@ double parseRho(int argc, char** argv, int rank);
 
 inline void external_eval_batch_host(const double* X, int D, int B, double* out)
 {
+    recordObjectiveEvaluations(B, false);
     auto& ext = globalExternalObjective();
     if (ext.fn_many) {
         ext.fn_many(X, D, B, out);

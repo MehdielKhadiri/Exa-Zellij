@@ -846,6 +846,20 @@ void prepareChildChunkFromParents(const std::vector<Hypersphere>& parents,
     Kokkos::deep_copy(signs, h_signs);
 }
 
+struct FBDProbeView {
+    Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> centers;
+    Kokkos::View<double*, mem_space> radii;
+    FBDExploration exploration;
+    int candidate, probe, dimension, seed, depth;
+    double lower, upper;
+    KOKKOS_INLINE_FUNCTION int extent(int) const { return dimension; }
+    KOKKOS_INLINE_FUNCTION double operator()(int d) const {
+        double x = centers(candidate, d) + fbdProbeOffset(
+            exploration, probe, candidate, d, dimension, radii(candidate), seed, depth);
+        return x < lower ? lower : (x > upper ? upper : x);
+    }
+};
+
 static void computeFBDScores(
     int numCandidates,
     int dimension,
@@ -872,7 +886,9 @@ static void computeFBDScores(
     const FBDScoring scoring = cfg.scoring;
     const int pointsPerCell = std::max(1, cfg.pointsPerCell);
 
-    if (usesAdditiveDeviceObjective(objType)) {
+    if (!usesExternalObjective(objType)) {
+        const bool additive = usesAdditiveDeviceObjective(objType);
+        recordObjectiveEvaluations(static_cast<long long>(numCandidates) * pointsPerCell, true);
         using team_policy = Kokkos::TeamPolicy<exec_space>;
         using member_type = team_policy::member_type;
 
@@ -893,7 +909,7 @@ static void computeFBDScores(
                 double termSum = 0.0;
                 double dist2 = 0.0;
 
-                Kokkos::parallel_reduce(
+                if (additive) Kokkos::parallel_reduce(
                     Kokkos::TeamThreadRange(team, dimension),
                     [&](int d, double& acc) {
                         double x = centers(i, d) +
@@ -916,6 +932,13 @@ static void computeFBDScores(
                                              expenseFactor);
                     },
                     termSum);
+                else Kokkos::parallel_reduce(
+                    Kokkos::TeamThreadRange(team, 1),
+                    [&](int, double& acc) {
+                        FBDProbeView point{centers, radii, exploration, i, p,
+                            dimension, seed, depth, objectiveLowerBound, objectiveUpperBound};
+                        acc += computeBuiltInObjective(point, expenseFactor, objType);
+                    }, termSum);
 
                 Kokkos::parallel_reduce(
                     Kokkos::TeamThreadRange(team, dimension),
@@ -1837,6 +1860,15 @@ struct BudgetPlan {
     double depthGamma = 1.0;
     std::vector<int> depthBudgets;
 };
+
+static long long globalObjectiveEvaluations()
+{
+    const long long local = objectiveEvaluationAudit().device.load() +
+                            objectiveEvaluationAudit().host.load();
+    long long global = 0;
+    MPI_Allreduce(&local, &global, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+    return global;
+}
 
 static std::vector<int> splitBudgetByWeights(int total,
                                               const std::vector<double>& weights)
@@ -3375,6 +3407,24 @@ const int numGPPoints = ftWillResume
                        static_cast<size_t>(dimension));
 const int pcaRankCap = std::min(100, dimension);
 
+// Include replicated DOE work and the initial-center call on each rank in
+// the physical evaluation cap. Reject an impossible initialization before
+// any objective calls, while leaving FBD's structural stopping rule intact.
+if (!useFBD && !ftWillResume) {
+    const long long localInitialization = static_cast<long long>(numGPPoints) + 1;
+    long long initialization = 0;
+    MPI_Allreduce(&localInitialization, &initialization, 1, MPI_LONG_LONG,
+                  MPI_SUM, MPI_COMM_WORLD);
+    if (initialization >= budget) {
+        if (world_rank == 0) {
+            std::cerr << "[Error] FBO initialization requires " << initialization
+                      << " evaluations, leaving no search budget within " << budget
+                      << ". Reduce --n-init or the rank count, or use distributed DOE.\n";
+        }
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+}
+
 if (!ftWillResume) {
     std::cout << "[rank " << world_rank
               << "] DOE local points = " << numGPPoints << "\n";
@@ -3680,6 +3730,24 @@ if (!ftWillResume) {
                                      exploitFraction,
                                      depthGamma,
                                      world_rank);
+
+            // Phase fractions are nominal allocations. Initialization also
+            // evaluates the center (and may replicate DOE evaluations), so
+            // exploration must fit the actual global remainder. Preserve the
+            // original depth allocation whenever it already fits.
+            const long long initialized = globalObjectiveEvaluations();
+            const int available = static_cast<int>(std::max(0LL,
+                static_cast<long long>(budget) - initialized));
+            if (budgetPlan.exploration > available) {
+                budgetPlan.exploration = available;
+                budgetPlan.depthBudgets = splitBudgetByWeights(
+                    available, makeDepthWeights(maxDepth, depthGamma));
+            }
+            if (world_rank == 0) {
+                std::cout << "[Budget] actual initialization evaluations = "
+                          << initialized << ", exploration cap = "
+                          << budgetPlan.exploration << "\n";
+            }
         }
 
         int activeMaxDepth = maxDepth;
@@ -4721,6 +4789,7 @@ if (!ftWillResume) {
                     const int actualB = B;
 
                     if (actualB == 0) continue;
+                    if (usesAdditiveDeviceObjective(objTy)) recordObjectiveEvaluations(actualB, true);
 
                     {
                         PROFILE_SCOPE("topB_selection_minloc");
@@ -6356,8 +6425,40 @@ if (!ftWillResume) {
                 // Exploitation at max depth.
                 // ------------------------------------------------------------
                 if (depth == activeMaxDepth) {
+                    const bool useRandomRestartExploit =
+                        fboConfig.exploitation == FBOExploitation::RandomRestartLocalSearch;
+                    const int startsPerCell = useRandomRestartExploit
+                        ? std::max(1, fboConfig.exploitStarts) : 1;
+                    int exploitationIterations = maxIterations;
+                    if (fboConfig.exploitation == FBOExploitation::BestCell ||
+                        fboConfig.exploitation == FBOExploitation::RandomLocalPerturbation) {
+                        exploitationIterations = 0;
+                    } else if (fboConfig.exploitLocalIters >= 0) {
+                        exploitationIterations = fboConfig.exploitLocalIters;
+                    }
+                    int exploitationCellLimit = budgetPlan.exploitation;
+                    if (!useFBD) {
+                        const long long used = globalObjectiveEvaluations();
+                        const long long available = std::max(0LL,
+                            static_cast<long long>(budget) - used);
+                        const long long allowance = std::min<long long>(
+                            budgetPlan.exploitation, available);
+                        // Reserve the worst-case calls for every selected
+                        // start, including coordinate probes in local search.
+                        const bool searches = usesAdditiveDeviceObjective(objTy);
+                        const long long perStart = 1 + (searches
+                            ? 2LL * dimension * std::max(0, exploitationIterations) : 0);
+                        exploitationCellLimit = static_cast<int>(
+                            allowance / perStart / startsPerCell);
+                        if (world_rank == 0) {
+                            std::cout << "[Budget] before exploitation used = " << used
+                                      << ", remaining = " << available
+                                      << ", exploitation cell cap = "
+                                      << exploitationCellLimit << "\n";
+                        }
+                    }
                     if (fboConfig.exploitation == FBOExploitation::None ||
-                        (!useFBD && budgetPlan.exploitation <= 0)) {
+                        (!useFBD && exploitationCellLimit <= 0)) {
                         if (world_rank == 0) {
                             auto finalPoint =
                                 Kokkos::create_mirror_view_and_copy(
@@ -6421,7 +6522,7 @@ if (!ftWillResume) {
                     if (!useFBD) {
                         numSelectedGlobal =
                             std::min(numSelectedGlobal,
-                                     budgetPlan.exploitation);
+                                     exploitationCellLimit);
                     }
 
                     if (world_rank == 0) {
@@ -6589,13 +6690,6 @@ if (!ftWillResume) {
                     }
 
                     const size_t free_bytes = get_available_memory();
-                    const bool useRandomRestartExploit =
-                        fboConfig.exploitation ==
-                        FBOExploitation::RandomRestartLocalSearch;
-                    const int startsPerCell = useRandomRestartExploit
-                        ? std::max(1, fboConfig.exploitStarts)
-                        : 1;
-
                     const size_t per_h =
                         3ull *
                         static_cast<size_t>(dimension) *
@@ -6615,17 +6709,6 @@ if (!ftWillResume) {
                                         myHyperspheres.size()),
                                     per_h ? (budget_b / per_h)
                                           : static_cast<size_t>(1))));
-
-                    int exploitationIterations = maxIterations;
-                    if (fboConfig.exploitation == FBOExploitation::BestCell) {
-                        exploitationIterations = 0;
-                    } else if (fboConfig.exploitation ==
-                               FBOExploitation::RandomLocalPerturbation) {
-                        exploitationIterations = 0;
-                    } else if (fboConfig.exploitLocalIters >= 0) {
-                        exploitationIterations =
-                            fboConfig.exploitLocalIters;
-                    }
 
                     if (world_rank == 0) {
                         std::cout << "[exploit] policy = "
@@ -7109,6 +7192,12 @@ if (!ftWillResume) {
 
         std::chrono::duration<double> duration = end - start;
 
+        long long localEvaluationCounts[2] = {
+            objectiveEvaluationAudit().device.load(), objectiveEvaluationAudit().host.load()};
+        long long globalEvaluationCounts[2] = {0,0};
+        MPI_Reduce(localEvaluationCounts, globalEvaluationCounts, 2, MPI_LONG_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
+        std::vector<long long> rankEvaluationCounts(static_cast<size_t>(2 * world_size));
+        MPI_Gather(localEvaluationCounts, 2, MPI_LONG_LONG, rankEvaluationCounts.data(), 2, MPI_LONG_LONG, 0, MPI_COMM_WORLD);
         const auto resultPath=parseOptionalStringArg(argc,argv,"--result-json","");
         if(world_rank==0 && !resultPath.empty()) {
             auto point=Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(),bestSolution);
@@ -7119,7 +7208,20 @@ if (!ftWillResume) {
             }
             result << std::setprecision(17) << "{\"schema_version\":1,\"family\":\""
                    << toString(optimizerFamily) << "\",\"fun\":" << bestObjectiveValue
-                   << ",\"elapsed_seconds\":" << duration.count() << ",\"x\":[";
+                   << ",\"elapsed_seconds\":" << duration.count()
+                   << ",\"device_evaluations\":" << globalEvaluationCounts[0]
+                   << ",\"host_evaluations\":" << globalEvaluationCounts[1]
+                   << ",\"evaluations\":" << globalEvaluationCounts[0] + globalEvaluationCounts[1]
+#if defined(KOKKOS_ENABLE_CUDA)
+                   << ",\"objective_backend\":\"CUDA\""
+#elif defined(KOKKOS_ENABLE_HIP)
+                   << ",\"objective_backend\":\"HIP\""
+#else
+                   << ",\"objective_backend\":\"CPU\""
+#endif
+                   << ",\"rank_evaluations\":[";
+            for(int r=0;r<world_size;++r) { if(r) result << ','; result << rankEvaluationCounts[2*r] + rankEvaluationCounts[2*r+1]; }
+            result << "],\"x\":[";
             for(int j=0;j<dimension;++j) { if(j) result << ','; result << point(j); }
             result << "]}\n";
             result.close();

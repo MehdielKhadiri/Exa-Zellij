@@ -416,7 +416,9 @@ double evalObjective(const std::vector<double>& x, ObjectiveType obj, int expens
                  Kokkos::HostSpace,
                  Kokkos::MemoryTraits<Kokkos::Unmanaged>>
         xh(x.data(), D);
-    return computeBuiltInObjective(xh, expenseFactor, obj);
+    Kokkos::View<double*, mem_space> deviceX("scalar_objective_x", D);
+    Kokkos::deep_copy(deviceX, xh);
+    return computeObjectiveValue(deviceX, expenseFactor, obj);
 }
 
 // ---------------------- Stationary GP kernels -----------------------------
@@ -1671,11 +1673,14 @@ void evalObjectiveBatchGPU(const std::vector<double>& X_host_tail,
     return;
   }
 
+  recordObjectiveEvaluations(new_N, true);
+
   View2D X_d("X_tail", new_N, D);
-  Kokkos::deep_copy(
-    X_d,
-    Kokkos::View<const double**, Kokkos::LayoutLeft, Kokkos::HostSpace,
-                 Kokkos::MemoryTraits<Kokkos::Unmanaged>>(X_host_tail.data(), new_N, D));
+  auto X_h = Kokkos::create_mirror_view(X_d);
+  for (int i = 0; i < new_N; ++i)
+    for (int j = 0; j < D; ++j)
+      X_h(i,j) = X_host_tail[static_cast<size_t>(i) * D + j];
+  Kokkos::deep_copy(X_d, X_h);
 
   View1D y_d("y_tail", new_N);
 

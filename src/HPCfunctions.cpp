@@ -20,6 +20,10 @@
 namespace {
 
 const ObjectiveInfo kObjectiveInfos[] = {
+    {ObjectiveType::ShiftedEllipsoid, "shifted-ellipsoid", "shifted-ill-conditioned", -5.0, 5.0,
+     true, true, false, true},
+    {ObjectiveType::ShiftedRastrigin, "shifted-rastrigin", "shifted-multimodal", -5.0, 5.0,
+     true, true, false, true},
     {ObjectiveType::External, "external", "user-callback", 0.0, 1.0,
      false, false, true, false},
     {ObjectiveType::Sphere,
@@ -240,6 +244,9 @@ double objectiveReferenceCoordinate(ObjectiveType objType,
     (void)dimension;
 
     switch (objType) {
+        case ObjectiveType::ShiftedEllipsoid:
+        case ObjectiveType::ShiftedRastrigin:
+            return qualityObjectiveShift(dimIndex);
         case ObjectiveType::Rosenbrock:
         case ObjectiveType::Levy:
         case ObjectiveType::ShiftedSphere:
@@ -993,6 +1000,8 @@ ObjectiveType parseObjectiveType(int argc, char* argv[], int idx, int wrank)
     if (s == "sphere") return ObjectiveType::Sphere;
     if (s == "rastrigin") return ObjectiveType::Rastrigin;
     if (s == "ellipsoid") return ObjectiveType::Ellipsoid;
+    if (s == "shifted-ellipsoid" || s == "shifted_ellipsoid") return ObjectiveType::ShiftedEllipsoid;
+    if (s == "shifted-rastrigin" || s == "shifted_rastrigin") return ObjectiveType::ShiftedRastrigin;
     if (s == "rosenbrock") return ObjectiveType::Rosenbrock;
     if (s == "ackley") return ObjectiveType::Ackley;
     if (s == "levy") return ObjectiveType::Levy;
@@ -1057,15 +1066,21 @@ double computeObjectiveValue(const Kokkos::View<double*, mem_space>& solution,
                              int expenseFactor,
                              ObjectiveType objType)
 {
-    auto hostSol = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), solution);
     if (usesExternalObjective(objType)) {
+        auto hostSol = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), solution);
         std::vector<double> x(static_cast<size_t>(hostSol.extent(0)));
         for (size_t i = 0; i < x.size(); ++i) x[i] = hostSol(i);
         double y = 1e300;
         external_eval_batch_host(x.data(), static_cast<int>(x.size()), 1, &y);
         return y;
     }
-    return computeBuiltInObjective(hostSol, expenseFactor, objType);
+    double value = 0.0;
+    Kokkos::parallel_reduce("native_objective_single", Kokkos::RangePolicy<exec_space>(0, 1),
+        KOKKOS_LAMBDA(int, double& sum) {
+            sum += computeBuiltInObjective(solution, expenseFactor, objType);
+        }, value);
+    recordObjectiveEvaluations(1, true);
+    return value;
 }
 
 void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& initCenters,
@@ -1086,7 +1101,16 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, 
     Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> newVal("ils_newVal", H, D);
     Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> termD("ils_termD", H, D);
 
-    if (!usesAdditiveDeviceObjective(objType)) {
+    if (!usesAdditiveDeviceObjective(objType) && !usesExternalObjective(objType)) {
+        Kokkos::parallel_for("native_ils_full_objective", Kokkos::RangePolicy<exec_space>(0, H),
+            KOKKOS_LAMBDA(int i) {
+                outBestVals(i) = computeObjectiveRow(initCenters, i, D, expenseFactor, objType);
+            });
+        if (outFinalPos.data() != nullptr) Kokkos::deep_copy(outFinalPos, initCenters);
+        recordObjectiveEvaluations(H, true);
+        return;
+    }
+    if (usesExternalObjective(objType)) {
         auto centers_h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), initCenters);
         std::vector<double> X_flat(size_t(H) * size_t(D));
         for (int i = 0; i < H; ++i) {
@@ -1120,6 +1144,8 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, 
 #else
     const auto ilsPolicy = policy(H, Kokkos::AUTO);
 #endif
+    Kokkos::View<long long*, mem_space> coordinateProposals("ils_coordinate_proposals", H);
+    Kokkos::deep_copy(coordinateProposals, 0LL);
     Kokkos::parallel_for("ILS_batch", ilsPolicy,
         KOKKOS_LAMBDA(const typename policy::member_type& team) {
             const int i = team.league_rank();
@@ -1144,6 +1170,7 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, 
 
             double omega = stepSize;
             for (int it = 0; it < maxIters; ++it) {
+                if (team.team_rank() == 0) coordinateProposals(i) += 2LL * D;
                 Kokkos::parallel_for(Kokkos::TeamThreadRange(team, D),
                     [&](int d) {
                         const double x = localB(i, d);
@@ -1190,6 +1217,10 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, 
                     [&](int d) { outFinalPos(i, d) = localB(i, d); });
             }
         });
+    auto proposalCounts = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), coordinateProposals);
+    long long evaluations = H;
+    for (int i = 0; i < H; ++i) evaluations += proposalCounts(i);
+    recordObjectiveEvaluations(evaluations, true);
 }
 
 template Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
