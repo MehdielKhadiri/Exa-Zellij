@@ -79,7 +79,7 @@ inline void gpu_potrf(GpuSolverHandle h, int n, double* A, int lda,
 #define GPU_DEV_SYNC()           (void)hipDeviceSynchronize()
 #define GPU_MEMCPY_D2H           hipMemcpyDeviceToHost
 #define GPU_MEMCPY_H2D           hipMemcpyHostToDevice
-#else
+#elif defined(KOKKOS_ENABLE_CUDA)
   // --- NVIDIA CUDA path ---
   #include <cuda_runtime.h>
   #include <cusolverDn.h>
@@ -104,6 +104,8 @@ inline void gpu_potrf(GpuSolverHandle h, int n, double* A, int lda,
   #define GPU_DEV_SYNC()           cudaDeviceSynchronize()
   #define GPU_MEMCPY_D2H           cudaMemcpyDeviceToHost
   #define GPU_MEMCPY_H2D           cudaMemcpyHostToDevice
+#else
+  #include "FQOCpuSolver.hpp"
 #endif
 
 
@@ -129,7 +131,7 @@ namespace {
 [[noreturn]] void failFast(const std::string& msg)
 {
     std::cerr << msg << std::endl;
-#if BO_DEBUG_TRAP_ON_SOLVER_ERROR
+#if BO_DEBUG_TRAP_ON_SOLVER_ERROR && defined(SIGTRAP)
     std::raise(SIGTRAP);      // keeps GDB stack alive
 #endif
     throw std::runtime_error(msg);
@@ -1521,7 +1523,7 @@ d.B = Kokkos::View<double**, layout_t, mem_space>("B", h.D_orig, h.d);
 //    (very plain, O(M·N·d); good enough to get you running)
 // ----------------------------------------------------------------------------
 void batchPredictGP(const DeviceGPModel& d_gp,
-                    Kokkos::View<const double**, mem_space> d_Xstar, // (M × r)
+                    Kokkos::View<const double**, Kokkos::LayoutLeft, mem_space> d_Xstar, // (M × r)
                     Kokkos::View<double*,        mem_space> d_mu,    // (M)
                     Kokkos::View<double*,        mem_space> d_var)   // (M)
 {
@@ -1532,7 +1534,7 @@ void batchPredictGP(const DeviceGPModel& d_gp,
   const double sf2   = d_gp.sigma_f*d_gp.sigma_f;
   const double k_xx  = sf2 + d_gp.sigma_n*d_gp.sigma_n;
 
-  Kokkos::View<double**, mem_space> Kstar("Kstar", M, N);
+  Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> Kstar("Kstar", M, N);
   gpKernelMatrixDevice(d_Xstar,
                        d_gp.X,
                        d_gp.l,
@@ -1617,8 +1619,8 @@ double negLogMarginalLikelihood(const GP::Model& m,
 
 
 void projectOnDevice(const DeviceGPModel& d_gp,
-                     Kokkos::View<const double**, mem_space> centers_chunk, // (M×D_orig)
-                     Kokkos::View<double**,       mem_space> d_Xstar)       // (M×d_latent)
+                     Kokkos::View<const double**, Kokkos::LayoutLeft, mem_space> centers_chunk, // (M×D_orig)
+                     Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> d_Xstar)       // (M×d_latent)
 {
   const int M = (int)centers_chunk.extent(0);
   const int D = d_gp.D_orig;
@@ -1641,7 +1643,7 @@ void projectOnDevice(const DeviceGPModel& d_gp,
   }
 
   // PCA fallback (dense)
-  Kokkos::View<double**, mem_space> d_Xstd("Xstd", M, D);
+  Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> d_Xstd("Xstd", M, D);
   Kokkos::parallel_for("standardizeX",
     Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0,0},{M,D}),
     KOKKOS_LAMBDA(int i,int j){

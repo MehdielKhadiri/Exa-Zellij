@@ -118,7 +118,7 @@ SimpleSurrogateDevice makeSimpleSurrogateDevice(
 }
 
 void predictSimpleSurrogate(const SimpleSurrogateDevice& model,
-                            const Kokkos::View<double**, mem_space>& Xstar,
+                            const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& Xstar,
                             Kokkos::View<double*, mem_space> mu,
                             Kokkos::View<double*, mem_space> var)
 {

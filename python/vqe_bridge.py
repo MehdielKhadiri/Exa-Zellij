@@ -121,9 +121,14 @@ def _debug_qchem_cache(molname: str, basis: str) -> None:
         pass
 
 # ---------- import reference construction code ----------
-from vqe_cost_reference import (
-    load_molecule, build_qubit_hamiltonian, make_uccsd_ansatz
-)
+if __package__:
+    from .vqe_cost_reference import (
+        load_molecule, build_qubit_hamiltonian, make_uccsd_ansatz
+    )
+else:
+    from vqe_cost_reference import (
+        load_molecule, build_qubit_hamiltonian, make_uccsd_ansatz
+    )
 
 # ---------- module session ----------
 _session: dict = {}  # holds compiled callables + config

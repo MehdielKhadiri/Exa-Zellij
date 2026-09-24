@@ -1,4 +1,4 @@
-#include <mpi.h>
+#include "FQOMpi.hpp"
 
 #include <Kokkos_Core.hpp>
 #include <Kokkos_Sort.hpp>
@@ -10,6 +10,7 @@
 #include "FBDConfig.hpp"
 #include "FBOSurrogateModels.hpp"
 #include "py_vqe_shim.hpp"
+#include "FQOStdioObjective.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -848,7 +849,7 @@ void prepareChildChunkFromParents(const std::vector<Hypersphere>& parents,
 static void computeFBDScores(
     int numCandidates,
     int dimension,
-    const Kokkos::View<double**, mem_space>& centers,
+    const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
     const Kokkos::View<double*, mem_space>& radii,
     const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& bestSolution,
     double bestObjectiveValue,
@@ -1043,7 +1044,12 @@ static void computeFBDScores(
                 dist2 += diff * diff;
             }
 
-            const double fx = computeBuiltInObjective(x, expenseFactor, objType);
+            double fx = 0.0;
+            if (usesExternalObjective(objType)) {
+                external_eval_batch_host(x.data(), dimension, 1, &fx);
+            } else {
+                fx = computeBuiltInObjective(x, expenseFactor, objType);
+            }
             const double dist = std::sqrt(dist2);
             meanFx += fx;
             if (fx < bestFx) {
@@ -2705,6 +2711,20 @@ static std::vector<double> makeInitialDoe(MPI_Comm comm,
 // ============================================================================
 
 int main(int argc, char* argv[]) {
+    if (argc==1 || hasOptionalArg(argc,argv,"--help")) {
+        std::cout << "Fractal Quantum Optimizer " << FQO_VERSION << "\n"
+          << "Usage: fractal_optimizer BEAM DIMENSION BUDGET EXPENSE OBJECTIVE [options]\n"
+          << "  --optimizer-family fbd|fbo   Select configurable family\n"
+          << "  --list-objectives           Show objective names\n"
+          << "  --result-json PATH          Save the final point/value as JSON\n"
+          << "  --seed N --max-depth N --lower-bound L --upper-bound U\n"
+          << "Python API: from fqo import minimize, Config\n"
+          << "Component options: docs/configuration.md\n";
+        return 0;
+    }
+    if (hasOptionalArg(argc,argv,"--version")) {
+        std::cout << FQO_VERSION << '\n'; return 0;
+    }
     int provided = 0;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
@@ -2801,6 +2821,10 @@ int main(int argc, char* argv[]) {
     int budget     = parseBudget(argc, argv, world_rank);
 
     int expenseFactor = parseExpenseFactor(argc, argv, world_rank);
+    if (dimension<=0 || budget<=0 || beta<=0) {
+        if(world_rank==0) std::cerr << "Dimension, budget and beam must be positive.\n";
+        MPI_Abort(MPI_COMM_WORLD,1);
+    }
 
     const ObjectiveType objTy = parseObjectiveType(argc, argv, 5, world_rank);
 
@@ -2841,6 +2865,26 @@ int main(int argc, char* argv[]) {
 
     double defaultLowerBound = objectiveDefaultLowerBound(objTy);
     double defaultUpperBound = objectiveDefaultUpperBound(objTy);
+
+    if (objTy == ObjectiveType::External) {
+        const auto module=parseOptionalStringArg(argc,argv,"--python-module","");
+        if (!module.empty()) {
+            const auto directory=parseOptionalStringArg(argc,argv,"--python-dir","");
+            if (init_python_objective(directory.c_str(),module.c_str(),dimension)) {
+                std::cerr << "Python objective initialization failed: " << vqe_last_error() << '\n';
+                MPI_Abort(MPI_COMM_WORLD,1);
+            }
+            globalExternalObjective().fn=&vqe_eval_trampoline;
+            globalExternalObjective().fn_many=&vqe_eval_many_trampoline;
+        } else {
+            if (world_size!=1 || !hasOptionalArg(argc,argv,"--objective-stdio")) {
+                if(world_rank==0) std::cerr << "Use the fqo Python API for pipe callbacks (one rank), or --python-module for MPI jobs.\n";
+                MPI_Abort(MPI_COMM_WORLD,1);
+            }
+            globalExternalObjective().fn=&fqo_stdio_one;
+            globalExternalObjective().fn_many=&fqo_stdio_many;
+        }
+    }
 
     if (objTy == ObjectiveType::VQE) {
         const std::string molecule =
@@ -3340,7 +3384,7 @@ if (!ftWillResume) {
         GP::DeviceGPModel d_gpModel;
         Kokkos::View<double*, mem_space> d_mu_X;
         Kokkos::View<double*, mem_space> d_sd_X;
-        Kokkos::View<double**, mem_space> d_B;
+        Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> d_B;
         FBO::SimpleSurrogateDevice simpleSurrogateModel;
         std::vector<double> trainingY;
 
@@ -4084,7 +4128,7 @@ if (!ftWillResume) {
 
                 int remaining = budget_per_rank;
 
-                Kokkos::View<double**, mem_space> d_Xstar;
+                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> d_Xstar;
                 Kokkos::View<double*, mem_space> d_mu;
                 Kokkos::View<double*, mem_space> d_var;
                 Kokkos::View<double*, mem_space> d_acq;
@@ -4151,11 +4195,11 @@ if (!ftWillResume) {
                 // ------------------------------------------------------------
                 const int r_latent = useGPSurrogate ? d_gpModel.d_latent : 1;
 
-                Kokkos::View<double**, mem_space> T;
+                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> T;
                 Kokkos::View<double*, mem_space> base_r;
 
                 if (useGPSurrogate) {
-                    T = Kokkos::View<double**, mem_space>("T", dimension, r_latent);
+                    T = Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>("T", dimension, r_latent);
                     using MD2 =
                         Kokkos::MDRangePolicy<Kokkos::Rank<2>, exec_space>;
 
@@ -4320,7 +4364,7 @@ if (!ftWillResume) {
                         } else {
                             PROFILE_SCOPE("simple_surrogate:predict");
 
-                            Kokkos::View<double**, mem_space> candidateCenters;
+                            Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> candidateCenters;
                             Kokkos::View<double*, mem_space> candidateRadii;
 
                             reconstructCentersAndRadii(
@@ -4356,7 +4400,7 @@ if (!ftWillResume) {
                         hA(0) = 1.0 / (1.0 + std::sqrt(2.0));
                         Kokkos::deep_copy(alphaDepthDev, hA);
 
-                        Kokkos::View<double**, mem_space> fbdCenters;
+                        Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> fbdCenters;
                         Kokkos::View<double*, mem_space> fbdRadii;
 
                         reconstructCentersAndRadii(
@@ -5832,9 +5876,23 @@ if (!ftWillResume) {
                 }
 
                 // ------------------------------------------------------------
-                // Global incumbent election by ID/value.
+                // FBD probes need their actual coordinates: a cell ID only
+                // reconstructs the centre, which may not be the winning probe.
                 // ------------------------------------------------------------
-                {
+                if (useFBD) {
+                    struct {
+                        double val;
+                        int rank;
+                    } mine{bestObjectiveValue, world_rank}, winner;
+                    MPI_Allreduce(&mine, &winner, 1, MPI_DOUBLE_INT,
+                                  MPI_MINLOC, MPI_COMM_WORLD);
+                    auto winningPoint = Kokkos::create_mirror_view_and_copy(
+                        Kokkos::HostSpace(), bestSolution);
+                    MPI_Bcast(winningPoint.data(), dimension, MPI_DOUBLE,
+                              winner.rank, MPI_COMM_WORLD);
+                    bestObjectiveValue = winner.val;
+                    Kokkos::deep_copy(bestSolution, winningPoint);
+                } else {
                     std::vector<int> localIDSer;
 
                     if (depthLocalBestValid) {
@@ -6444,7 +6502,7 @@ if (!ftWillResume) {
                                            e_dims,
                                            e_signs);
 
-                    Kokkos::View<double**, mem_space> e_centers;
+                    Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> e_centers;
                     Kokkos::View<double*, mem_space> e_radii;
 
                     {
@@ -6493,12 +6551,12 @@ if (!ftWillResume) {
                     if (fboConfig.adaptiveExploitationScale &&
                         useGPSurrogate &&
                         !myHyperspheres.empty()) {
-                        Kokkos::View<double**, mem_space>
+                        Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
                             projectedCenters(
                                 "exploit_projected_centers",
                                 myHyperspheres.size(),
                                 d_gpModel.d_latent);
-                        Kokkos::View<const double**, mem_space>
+                        Kokkos::View<const double**, Kokkos::LayoutLeft, mem_space>
                             constExploitCenters = e_centers;
                         GP::projectOnDevice(d_gpModel,
                                             constExploitCenters,
@@ -6632,7 +6690,7 @@ if (!ftWillResume) {
                         Kokkos::View<double*, mem_space>
                             bestVals("bestVals", evalCount);
 
-                        Kokkos::View<double**, mem_space>
+                        Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
                             finalPos("finalPos", evalCount, dimension);
 
                         {
@@ -6642,7 +6700,7 @@ if (!ftWillResume) {
                             if (fboConfig.exploitation ==
                                     FBOExploitation::RandomLocalPerturbation ||
                                 useRandomRestartExploit) {
-                                Kokkos::View<double**, mem_space>
+                                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
                                     randomStarts("random_exploit_starts",
                                                  evalCount,
                                                  dimension);
@@ -7050,6 +7108,23 @@ if (!ftWillResume) {
         auto end = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double> duration = end - start;
+
+        const auto resultPath=parseOptionalStringArg(argc,argv,"--result-json","");
+        if(world_rank==0 && !resultPath.empty()) {
+            auto point=Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(),bestSolution);
+            std::ofstream result(resultPath);
+            if(!result || !std::isfinite(bestObjectiveValue)) {
+                std::cerr << "Cannot write a finite optimization result to " << resultPath << '\n';
+                MPI_Abort(MPI_COMM_WORLD,1);
+            }
+            result << std::setprecision(17) << "{\"schema_version\":1,\"family\":\""
+                   << toString(optimizerFamily) << "\",\"fun\":" << bestObjectiveValue
+                   << ",\"elapsed_seconds\":" << duration.count() << ",\"x\":[";
+            for(int j=0;j<dimension;++j) { if(j) result << ','; result << point(j); }
+            result << "]}\n";
+            result.close();
+            if(!result) MPI_Abort(MPI_COMM_WORLD,1);
+        }
 
         if (world_rank == 0) {
             if (useFBD) {

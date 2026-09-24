@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "cpu",
+      "displayName": "Portable CPU, no MPI or embedded Python",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-cpu",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FQO_GPU_BACKEND": "CPU",
+        "FQO_ENABLE_MPI": "OFF",
+        "FQO_ENABLE_PYTHON": "OFF",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "cpu-mpi",
+      "inherits": "cpu",
+      "binaryDir": "${sourceDir}/build-cpu-mpi",
+      "cacheVariables": {"FQO_ENABLE_MPI": "ON"}
+    }
+  ],
+  "buildPresets": [{"name": "cpu", "configurePreset": "cpu", "jobs": 2}],
+  "testPresets": [{"name": "cpu", "configurePreset": "cpu", "output": {"outputOnFailure": true}}]
+}

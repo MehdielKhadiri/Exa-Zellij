@@ -1,0 +1,37 @@
+[build-system]
+requires = ["scikit-build-core>=0.10,<2"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "fractal-quantum-optimizer"
+version = "0.3.0.dev0"
+description = "Configurable compiled FBD and FBO optimization with optional HPC and quantum adapters"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "Mehdi El Khadiri"}]
+dependencies = []
+classifiers = ["Operating System :: POSIX :: Linux"]
+
+[project.optional-dependencies]
+vqe = ["numpy==2.2.6", "pennylane==0.42.3", "pennylane-lightning==0.42.0",
+       "jax==0.6.2", "jaxlib==0.6.2", "pyscf==2.10.0", "h5py==3.14.0"]
+test = ["pytest>=7"]
+
+[project.scripts]
+fqo = "fqo.__main__:main"
+
+[tool.scikit-build]
+cmake.version = ">=3.20"
+wheel.packages = ["python/fqo"]
+install.components = ["fqo"]
+build.targets = ["fractal_optimizer"]
+build.tool-args = ["-j2"]
+sdist.exclude = ["reproducibility", "build*", ".git", "results", "logs*"]
+
+[tool.scikit-build.cmake.define]
+FQO_GPU_BACKEND = "CPU"
+FQO_USE_SYSTEM_KOKKOS = "OFF"
+FQO_ENABLE_MPI = "OFF"
+FQO_ENABLE_PYTHON = "OFF"
+BUILD_TESTING = "OFF"

@@ -237,7 +237,7 @@ DeviceGPModel makeDeviceCopy(const Model& h,
                              double rqAlpha = 1.0);
 
 void batchPredictGP(const DeviceGPModel& d_gp,
-                    Kokkos::View<const double**, mem_space> d_Xstar,
+                    Kokkos::View<const double**, Kokkos::LayoutLeft, mem_space> d_Xstar,
                     Kokkos::View<double*, mem_space> d_mu,
                     Kokkos::View<double*, mem_space> d_var);
 
@@ -281,8 +281,8 @@ Model updateGP_incremental(const Model& oldModel,
                            double rqAlpha = 1.0);
 
 void projectOnDevice(const DeviceGPModel& d_gp,
-                     Kokkos::View<const double**, mem_space> centers_chunk,
-                     Kokkos::View<double**, mem_space> d_Xstar);
+                     Kokkos::View<const double**, Kokkos::LayoutLeft, mem_space> centers_chunk,
+                     Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> d_Xstar);
 
 Model updateGP_incremental_knownY(const Model& old,
                                   const std::vector<double>& X_new,

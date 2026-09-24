@@ -3,7 +3,7 @@
 
 #include <Kokkos_Core.hpp>
 #include <Kokkos_Random.hpp>
-#include <mpi.h>
+#include "FQOMpi.hpp"
 
 #include "FBOTypes.hpp"
 
@@ -39,12 +39,13 @@ enum class ObjectiveType {
     BentCigar,
     Discus,
     SharpRidge,
-    DifferentPowers
+    DifferentPowers,
+    External
 };
 
 inline bool usesExternalObjective(ObjectiveType objType)
 {
-    return objType == ObjectiveType::VQE;
+    return objType == ObjectiveType::VQE || objType == ObjectiveType::External;
 }
 
 inline bool usesAdditiveDeviceObjective(ObjectiveType objType)
@@ -625,6 +626,7 @@ double computeObjective(const View1D& x, int expenseFactor, ObjectiveType objTyp
 {
     switch (objType) {
         case ObjectiveType::VQE:           return vqeObjectiveFunction(x);
+        case ObjectiveType::External:      return vqeObjectiveFunction(x);
         default:                           return computeBuiltInObjective(x, expenseFactor, objType);
     }
 }
@@ -657,7 +659,7 @@ reconstructCenter(const Hypersphere& hs,
                   FBODecomposition decomposition);
 
 template <typename PoolT>
-Kokkos::View<double**, mem_space>
+Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
 generateRandomPointsAroundCenter(const Kokkos::View<double*, mem_space>& center,
                                  double radius,
                                  int dimension,
@@ -679,7 +681,7 @@ void reconstructCentersAndRadii(size_t nHypers,
                                 const Kokkos::View<int*, mem_space>& idSigns,
                                 const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initCenterDev,
                                 const Kokkos::View<double*, mem_space>& alphaDepthDev,
-                                Kokkos::View<double**, mem_space>& centers,
+                                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
                                 Kokkos::View<double*, mem_space>& radii,
                                 FBODecomposition decomposition = FBODecomposition::Hypersphere);
 
@@ -691,12 +693,12 @@ void reconstructCentersAndRadii(size_t nHypers,
                                 const Kokkos::View<int*, mem_space>& idDims,
                                 const Kokkos::View<int*, mem_space>& idSigns,
                                 const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initCenterDev,
-                                Kokkos::View<double**, mem_space>& centers,
+                                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
                                 Kokkos::View<double*, mem_space>& radii);
 
 void scoreHyperspheres(size_t nHypers,
                        int dimension,
-                       const Kokkos::View<double**, mem_space>& centers,
+                       const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
                        const Kokkos::View<double*, mem_space>& radii,
                        const Kokkos::View<double*, mem_space>& bestSolutionDev,
                        double bestObjVal,
@@ -722,7 +724,7 @@ intensiveLocalSearch(const Hypersphere& hs,
                      ObjectiveType objType,
                      int expenseFactor);
 
-void intensiveLocalSearchBatch(const Kokkos::View<double**, mem_space>& initCenters,
+void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& initCenters,
                                int maxIters,
                                double stepSize,
                                double phi,
@@ -730,7 +732,7 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, mem_space>& initCent
                                ObjectiveType objType,
                                int expenseFactor,
                                Kokkos::View<double*, mem_space>& outBestVals,
-                               Kokkos::View<double**, mem_space> outFinalPos);
+                               Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> outFinalPos);
 
 std::vector<Hypersphere> decomposeHypersphere(const Hypersphere& parent);
 std::vector<Hypersphere> decomposeHypersphere(const Hypersphere& parent,

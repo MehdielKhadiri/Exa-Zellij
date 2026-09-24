@@ -1,0 +1,93 @@
+FBD / FBO — QUICK START
+======================
+
+Run these commands from the repository folder containing pyproject.toml.
+This guide describes the developing 0.3 interface, not the older public tag.
+
+1. INSTALL ON LINUX OR WSL (CPU)
+
+Linux is the supported operating system. On Windows, open Ubuntu/WSL and run
+the Linux commands there. Native Windows installation is outside the scope.
+You need Python 3.10+, Git and a C++20 compiler such as GCC 11 or newer.
+The first installation compiles the optimizer and downloads missing build
+dependencies, so allow several minutes. GPU/MPI/VQE packages are optional.
+
+Create an environment:
+    python -m venv .venv
+
+Activate it:
+    source .venv/bin/activate
+
+Install and check:
+    python -m pip install .
+    fqo doctor
+    python examples/python_quickstart.py
+
+On Ubuntu, use python3 instead of python if that is your command name.
+
+2. USE YOUR OWN OBJECTIVE
+
+Save the following as my_run.py:
+
+    from fqo import Config, minimize
+
+    def objective(x):
+        return sum((value - 0.3)**2 for value in x)
+
+    result = minimize(
+        objective,
+        bounds=[(-5, 5)] * 3,
+        config=Config(family="fbo", budget=100,
+                      components={"surrogate": "rbf"}),
+    )
+    print("Best point:", result.x)
+    print("Objective value:", result.fun)
+    print("Evaluations:", result.nfev)
+
+Run:
+    python my_run.py
+
+Replace objective() with your calculation and bounds with your domain.
+Lower objective values are better. Return one finite number per call.
+
+For FBD, replace the Config(...) above with:
+    Config(family="fbd", max_depth=3, beam=4)
+
+FBD has NO evaluation-budget parameter: its configuration determines its work.
+FBO takes a maximum number of objective evaluations and may finish earlier.
+The Python interface normalizes bounds internally; your function and the result
+use your original units. See docs/user-guide.md for initial-design defaults.
+
+3. USE A CONFIGURATION FILE
+
+Edit examples/quickstart.json and examples/user_objective.py, then run:
+    fqo run examples/quickstart.json --output result.json
+
+4. BUILD FOR NVIDIA OR AMD
+
+Load/install your system's CUDA or ROCm development tools first. Then:
+    python configure.py --build
+
+The helper detects CPU, CUDA or HIP. To inspect its choice without building:
+    python configure.py --dry-run
+
+HPC login nodes sometimes need an explicit compute-node target:
+    python configure.py --backend cuda --arch HOPPER90 --mpi --build
+    python configure.py --backend hip --arch VEGA90A --mpi --build
+
+Those targets are for JUPITER GH200 and AMD MI210/MI250 respectively.
+Use docs/jupiter.md or docs/lumi-g.md for modules and scheduler commands.
+Run GPU work on allocated compute nodes. The ordinary pip install builds CPU;
+configure.py creates a separate native executable for your chosen backend.
+
+5. WHERE TO FIND MORE
+
+docs/user-guide.md   : batches, other-language executables, MPI and optional VQE
+docs/configuration.md: all native family/component choices
+docs/jupiter.md      : build and submit on JUPITER
+docs/lumi-g.md       : LUMI HIP and VQE environment
+docs/grid5000-hip.md : AMD MI210 build and test job on Grid'5000
+docs/validation.md   : what has actually been tested
+
+WSL means Linux running inside Windows. The Linux/WSL CPU installation has
+been tested; no separate native Windows build is required for this workflow.

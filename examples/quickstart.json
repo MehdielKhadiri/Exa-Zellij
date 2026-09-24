@@ -1,0 +1,11 @@
+{
+  "objective": "user_objective:loss",
+  "bounds": [[-5, 5], [-5, 5], [-5, 5]],
+  "config": {
+    "family": "fbo",
+    "budget": 100,
+    "seed": 0,
+    "max_depth": 3,
+    "components": {"decomposition": "trisection", "surrogate": "rbf"}
+  }
+}

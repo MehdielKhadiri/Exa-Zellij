@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <iostream>
 #include <atomic>
+#include <cmath>
+#include "FQOMpi.hpp"
 
 namespace fs = std::filesystem;
 namespace py = pybind11;
@@ -44,7 +46,9 @@ struct PyVQE {
 
     PyVQE(const std::string& user_dir,
           const std::string& mol,
-          const std::string& basis)
+          const std::string& basis,
+          const std::string& module_name = "vqe_bridge",
+          int dimension = 0)
     : guard{} {
         try {
             py::gil_scoped_acquire gil;
@@ -52,7 +56,7 @@ struct PyVQE {
             auto sys_path = sys.attr("path").cast<py::list>();
 
             // 1) user-provided dir
-            if (!user_dir.empty()) append_path(sys_path, user_dir);
+            if (!user_dir.empty()) sys_path.attr("insert")(0, user_dir);
 
             // 2) compile-time source dir fallback
         #ifdef VQE_PY_DIR
@@ -76,17 +80,22 @@ struct PyVQE {
             // Import + init
             // Use importlib and force a reload so we never get a stale module
             auto importlib = py::module_::import("importlib");
-            mod = importlib.attr("import_module")("vqe_bridge");
+            mod = importlib.attr("import_module")(module_name);
             importlib.attr("reload")(mod);
             py::object modfile = mod.attr("__file__");
             py::print("[VQE shim] using module:", modfile);
             py::print("[VQE shim] args mol/basis passed from C++:", mol, basis);
-            n_params = mod.attr("init")(mol, basis).cast<int>();
-            eval_fn       = mod.attr("eval");
+            if (dimension > 0) {
+                n_params = dimension;
+                if (py::hasattr(mod,"init")) mod.attr("init")(dimension);
+            } else {
+                n_params = mod.attr("init")(mol, basis).cast<int>();
+            }
+            eval_fn = mod.attr(dimension > 0 ? "evaluate" : "eval");
             eval_batch_fn = py::none();
             // eval_batch may not exist in older vqe_bridge; guard it
-            if (py::hasattr(mod, "eval_batch"))
-                eval_batch_fn = mod.attr("eval_batch");
+            const char* batch_name = dimension > 0 ? "evaluate_batch" : "eval_batch";
+            if (py::hasattr(mod, batch_name)) eval_batch_fn = mod.attr(batch_name);
             // success path: clear any previous error
             set_ok();
         } catch (const py::error_already_set& e) {
@@ -114,7 +123,9 @@ struct PyVQE {
     py::array_t<double> arr({D}, {sizeof(double)}, x);
 
     py::object out = eval_fn(arr);
-    return out.cast<double>();
+    const double value=out.cast<double>();
+    if (!std::isfinite(value)) throw std::runtime_error("objective returned a non-finite value");
+    return value;
 }
 
 void eval_many(const double* X, int D, int N, double* out) {
@@ -129,14 +140,16 @@ void eval_many(const double* X, int D, int N, double* out) {
         py::array_t<double> arr({N, D}, {sizeof(double)*D, sizeof(double)}, X);
         try {
             py::object out_obj = eval_batch_fn(arr);
-            py::array res = out_obj.cast<py::array>();
-            if (res.ndim() != 1 || res.shape(0) != N)
+            auto res = py::array_t<double,py::array::c_style | py::array::forcecast>::ensure(out_obj);
+            if (!res || res.ndim() != 1 || res.shape(0) != N)
                 throw std::runtime_error("eval_batch returned wrong shape");
             std::memcpy(out, res.data(), sizeof(double) * N);
+            for (int i=0;i<N;++i) if (!std::isfinite(out[i]))
+                throw std::runtime_error("batch objective returned a non-finite value");
         } catch (const std::exception& e) {
             std::cerr << "[VQE shim] batched evaluation failed: "
                       << e.what() << std::endl;
-            std::fill(out, out + N, 1e300);
+            throw;
         }
     } else {
         for (int n = 0; n < N; ++n) {
@@ -172,19 +185,39 @@ int init_vqe_bridge(const char* py_dir, const char* mol, const char* basis) {
     return 0;
 }
 
+int init_python_objective(const char* py_dir, const char* module, int dimension) {
+    if (dimension <= 0 || !module || !*module) {
+        set_fail("A Python module and positive dimension are required"); return 1;
+    }
+    if (g_py) { delete g_py; g_py=nullptr; }
+    g_py=new PyVQE(py_dir ? py_dir : "", "", "", module, dimension);
+    return g_ready.load() ? 0 : 1;
+}
+
 int vqe_num_params() {
     return g_py ? g_py->n_params : 0;
 }
 
 double vqe_eval_trampoline(const double* x, int D) {
-    return g_py ? g_py->eval(x, D) : 1e300;
+    try {
+        if (!g_py || !g_ready.load()) throw std::runtime_error("Objective is not initialized");
+        return g_py->eval(x,D);
+    } catch (const std::exception& error) {
+        std::cerr << "Objective evaluation failed: " << error.what() << std::endl;
+        MPI_Abort(MPI_COMM_WORLD,1); return 0;
+    }
 }
 
 
 // New: batched trampoline
 void vqe_eval_many_trampoline(const double* X, int D, int N, double* out) {
-    if (!g_py || !g_ready.load()) { std::fill(out, out+N, 1e300); return; }
-    g_py->eval_many(X, D, N, out);
+    try {
+        if (!g_py || !g_ready.load()) throw std::runtime_error("Objective is not initialized");
+        g_py->eval_many(X,D,N,out);
+    } catch (const std::exception& error) {
+        std::cerr << "Objective evaluation failed: " << error.what() << std::endl;
+        MPI_Abort(MPI_COMM_WORLD,1);
+    }
 }
 
 

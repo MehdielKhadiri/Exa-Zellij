@@ -20,6 +20,8 @@
 namespace {
 
 const ObjectiveInfo kObjectiveInfos[] = {
+    {ObjectiveType::External, "external", "user-callback", 0.0, 1.0,
+     false, false, true, false},
     {ObjectiveType::Sphere,
      "sphere",
      "smooth-convex-separable",
@@ -423,14 +425,14 @@ reconstructCenter(const Hypersphere& hs,
 }
 
 template <typename PoolT>
-Kokkos::View<double**, mem_space>
+Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
 generateRandomPointsAroundCenter(const Kokkos::View<double*, mem_space>& center,
                                  double radius,
                                  int dimension,
                                  PoolT& randPool,
                                  int numPoints)
 {
-    Kokkos::View<double**, mem_space> points("points", numPoints, dimension);
+    Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> points("points", numPoints, dimension);
     using policy = Kokkos::TeamPolicy<exec_space>;
 
     Kokkos::parallel_for("GenRandPoints", policy(numPoints, Kokkos::AUTO),
@@ -446,7 +448,7 @@ generateRandomPointsAroundCenter(const Kokkos::View<double*, mem_space>& center,
                     s += u * u;
                 }, norm2);
 
-            const double inv_norm = rsqrt(norm2 + 1e-30);
+            const double inv_norm = Kokkos::rsqrt(norm2 + 1e-30);
             Kokkos::parallel_for(Kokkos::TeamThreadRange(team, dimension),
                 [&](int d) { points(i, d) *= inv_norm; });
             team.team_barrier();
@@ -512,11 +514,11 @@ void reconstructCentersAndRadii(size_t nHypers,
                                 const Kokkos::View<int*, mem_space>& idSigns,
                                 const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initCenterDev,
                                 const Kokkos::View<double*, mem_space>& alphaDepthDev,
-                                Kokkos::View<double**, mem_space>& centers,
+                                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
                                 Kokkos::View<double*, mem_space>& radii,
                                 FBODecomposition decomposition)
 {
-    centers = Kokkos::View<double**, mem_space>("centers", nHypers, dimension);
+    centers = Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>("centers", nHypers, dimension);
     radii = Kokkos::View<double*, mem_space>("radii", nHypers);
 
     using MD2 = Kokkos::MDRangePolicy<Kokkos::Rank<2>, exec_space>;
@@ -569,7 +571,7 @@ void reconstructCentersAndRadii(size_t nHypers,
                                 const Kokkos::View<int*, mem_space>& idDims,
                                 const Kokkos::View<int*, mem_space>& idSigns,
                                 const Kokkos::View<double*, Kokkos::LayoutLeft, mem_space>& initCenterDev,
-                                Kokkos::View<double**, mem_space>& centers,
+                                Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
                                 Kokkos::View<double*, mem_space>& radii)
 {
     Kokkos::View<double*, mem_space> alphaDepthDev("alphaDepthDev_const", 1);
@@ -586,7 +588,7 @@ void reconstructCentersAndRadii(size_t nHypers,
 
 void scoreHyperspheres(size_t nHypers,
                        int dimension,
-                       const Kokkos::View<double**, mem_space>& centers,
+                       const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& centers,
                        const Kokkos::View<double*, mem_space>& radii,
                        const Kokkos::View<double*, mem_space>& bestSolutionDev,
                        double bestObjVal,
@@ -908,7 +910,8 @@ size_t get_available_memory()
     if (hipMemGetInfo(&free_b, &total_b) != hipSuccess) return 0;
     return free_b;
 #else
-    return 0;
+    // Conservative CPU workspace allowance; callers use fractions of this.
+    return 256ull * 1024 * 1024;
 #endif
 }
 
@@ -994,6 +997,7 @@ ObjectiveType parseObjectiveType(int argc, char* argv[], int idx, int wrank)
     if (s == "ackley") return ObjectiveType::Ackley;
     if (s == "levy") return ObjectiveType::Levy;
     if (s == "vqe") return ObjectiveType::VQE;
+    if (s == "external") return ObjectiveType::External;
     if (s == "shiftedsphere" || s == "shifted_sphere" ||
         s == "shifted-sphere") {
         return ObjectiveType::ShiftedSphere;
@@ -1023,11 +1027,12 @@ ObjectiveType parseObjectiveType(int argc, char* argv[], int idx, int wrank)
 
     if (wrank == 0) {
         std::cerr << "Unknown objective \"" << raw
-                  << "\" - falling back to Sphere.\n"
+                  << "\".\n"
                   << "Available objectives: "
                   << availableObjectiveNames() << "\n";
     }
-    return ObjectiveType::Sphere;
+    MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    return ObjectiveType::Sphere; // unreachable; required by some MPI headers
 }
 
 double parseRho(int argc, char** argv, int rank)
@@ -1063,7 +1068,7 @@ double computeObjectiveValue(const Kokkos::View<double*, mem_space>& solution,
     return computeBuiltInObjective(hostSol, expenseFactor, objType);
 }
 
-void intensiveLocalSearchBatch(const Kokkos::View<double**, mem_space>& initCenters,
+void intensiveLocalSearchBatch(const Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>& initCenters,
                                int maxIters,
                                double stepSize,
                                double phi,
@@ -1071,15 +1076,15 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, mem_space>& initCent
                                ObjectiveType objType,
                                int expenseFactor,
                                Kokkos::View<double*, mem_space>& outBestVals,
-                               Kokkos::View<double**, mem_space> outFinalPos)
+                               Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> outFinalPos)
 {
     const int H = static_cast<int>(initCenters.extent(0));
     const int D = static_cast<int>(initCenters.extent(1));
     if (H == 0) return;
 
-    Kokkos::View<double**, mem_space> localB("ils_localB", H, D);
-    Kokkos::View<double**, mem_space> newVal("ils_newVal", H, D);
-    Kokkos::View<double**, mem_space> termD("ils_termD", H, D);
+    Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> localB("ils_localB", H, D);
+    Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> newVal("ils_newVal", H, D);
+    Kokkos::View<double**, Kokkos::LayoutLeft, mem_space> termD("ils_termD", H, D);
 
     if (!usesAdditiveDeviceObjective(objType)) {
         auto centers_h = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), initCenters);
@@ -1110,7 +1115,12 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, mem_space>& initCent
     }
 
     using policy = Kokkos::TeamPolicy<exec_space>;
-    Kokkos::parallel_for("ILS_batch", policy(H, 128, 1),
+#if defined(KOKKOS_ENABLE_CUDA) || defined(KOKKOS_ENABLE_HIP)
+    const auto ilsPolicy = policy(H, 128, 1);
+#else
+    const auto ilsPolicy = policy(H, Kokkos::AUTO);
+#endif
+    Kokkos::parallel_for("ILS_batch", ilsPolicy,
         KOKKOS_LAMBDA(const typename policy::member_type& team) {
             const int i = team.league_rank();
             const double c0 = objectiveConstant(objType);
@@ -1182,7 +1192,7 @@ void intensiveLocalSearchBatch(const Kokkos::View<double**, mem_space>& initCent
         });
 }
 
-template Kokkos::View<double**, mem_space>
+template Kokkos::View<double**, Kokkos::LayoutLeft, mem_space>
 generateRandomPointsAroundCenter<Kokkos::Random_XorShift64_Pool<exec_space>>(
     const Kokkos::View<double*, mem_space>&,
     double,

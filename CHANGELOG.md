@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — in development
+
+- Added an optional CPU solver backend and single-process execution without MPI.
+- Added a Python callable/batch/executable interface and editable JSON runs.
+- Kept FBD structurally controlled; FBO accepts an evaluation budget.
+- Added installable source packaging, backend detection and executable tests.
+- Added a JUPITER build and four-rank smoke recipe; platform validation is
+  tracked in `docs/validation.md`.
+- Fixed external FBD probe scoring to invoke the registered callback instead
+  of the built-in objective fallback. Unknown objective names now fail.
+- Fixed MPI FBD incumbent exchange to carry the actual best probe coordinates
+  with its value, rather than substituting the containing cell's centre.
+- Added generic embedded Python modules and checked batch conversion/shape,
+  finite results and propagated evaluation failures.
+
 ## 0.2.0 — 2026-08-27
 
 - Added the Grid'5000 equal-call, knowledge-driven, and robustness experiment

@@ -1,0 +1,29 @@
+name: Linux CPU package
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip wheel . --no-deps --wheel-dir dist
+      - name: Install and test the built wheel
+        shell: python
+        run: |
+          import glob, subprocess, sys
+          wheel = glob.glob('dist/*.whl')[0]
+          subprocess.run([sys.executable, '-m', 'pip', 'install', wheel], check=True)
+          code = "import os, runpy; from fqo.api import executable_path; os.environ['FQO_EXECUTABLE']=executable_path(); runpy.run_path('tests/test_api.py', run_name='__main__')"
+          subprocess.run([sys.executable, '-c', code], check=True)
+      - run: python reproducibility/verify_results.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.python }}
+          path: dist/*.whl

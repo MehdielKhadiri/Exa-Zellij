@@ -6,6 +6,23 @@ and a PennyLane/JAX evaluator inside the site ROCm container.
 
 ## 1. Clone and build
 
+For a core-only HIP build, after loading a compatible site ROCm/CMake/MPI
+environment, the new helper selects the backend/compiler before CMake starts:
+
+```bash
+python3 configure.py --backend hip --arch VEGA90A --mpi --build
+```
+
+Omit `--backend` when only the intended toolchain is loaded. Use `--prefix` for
+a site Kokkos installation; add `--python` for the embedded objective bridge.
+An installed Kokkos retains its compiled target architecture. The helper uses
+`hipcc`; if the site's MPI setup requires its Cray wrapper, pass the configured
+wrapper with `--cxx`. See the site's
+[compiler instructions](https://docs.lumi-supercomputer.eu/development/compiling/prgenv/).
+The developing 0.3 revision still needs an AMD runtime validation.
+
+The earlier VQE/container experiment recipe remains available below:
+
 ```bash
 git clone <repository-url> fractal-quantum-optimizer
 cd fractal-quantum-optimizer

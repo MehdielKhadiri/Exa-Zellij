@@ -1,11 +1,53 @@
 # Fractal Quantum Optimizer
 
-A configurable MPI/Kokkos implementation of:
+A configurable C++/Kokkos implementation, with a Python interface and optional
+MPI, NVIDIA CUDA, AMD HIP and VQE support, of:
 
 - **Fractal-Based Decomposition (FBD)**, where decomposition, exploration,
   scoring, tree search, and exploitation are selected independently; and
 - **Fractal Bayesian Optimization (FBO)**, where a surrogate and acquisition
   function guide the fractal search under a fixed objective-evaluation budget.
+
+## Start on Linux or WSL
+
+Start with [QUICKSTART.txt](QUICKSTART.txt) for copy-and-paste installation and
+first-run instructions, or the [full guide](docs/user-guide.md) for more options.
+
+The supported operating system is Linux, including Ubuntu through WSL on a
+Windows PC. Native Windows is outside the supported scope. The developing 0.3
+interface runs on CPU without MPI or quantum dependencies. Source installation
+needs Python 3.10+, Git and a C++20 compiler such as GCC 11+.
+
+```sh
+python -m pip install .
+fqo doctor
+python examples/python_quickstart.py
+```
+
+```python
+from fqo import Config, minimize
+
+def loss(x):
+    return sum((v - 0.3)**2 for v in x)
+
+result = minimize(loss, bounds=[(-5, 5)] * 3,
+                  config=Config(family="fbo", budget=100,
+                                components={"surrogate": "rbf"}))
+print(result.x, result.fun, result.nfev)
+```
+
+For FBD use `Config(family="fbd", max_depth=3, beam=4)`: **FBD has no
+evaluation-budget parameter**; its configuration determines its evaluation
+count. FBO uses an evaluation budget. User callbacks and executable adapters
+require no C++ edits. See the [user guide](docs/user-guide.md) for JSON
+configuration, batched objectives and install details.
+
+For accelerator builds, load your site's toolchain and run
+`python configure.py --build`. The helper detects an existing Kokkos backend,
+or CUDA/HIP compilers, with explicit target overrides for HPC login nodes.
+Use [JUPITER](docs/jupiter.md) or [LUMI-G](docs/lumi-g.md) instructions on those
+systems. See [validation status](docs/validation.md) before relying on a platform;
+source installation and tested/published binary wheels are distinct.
 
 The repository also contains the hybrid VQE path exercised on Grid'5000 and LUMI-G:
 the compiled optimizer calls a batched PennyLane/JAX objective through an
@@ -65,7 +107,7 @@ recomputes the LUMI-G scaling and solution-quality quantities.  Full provenance
 and rerun instructions are in
 [`reproducibility/README.md`](reproducibility/README.md).
 
-## Build
+## Advanced GPU/HPC build
 
 Requirements:
 
@@ -80,9 +122,10 @@ CUDA:
 ```bash
 cmake -S . -B build-cuda -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
-  -DFQO_GPU_BACKEND=CUDA \
+  -DCMAKE_CXX_COMPILER=nvcc_wrapper \
+  -DFQO_GPU_BACKEND=CUDA -DFQO_ENABLE_MPI=ON -DFQO_ENABLE_PYTHON=ON \
   -DCMAKE_PREFIX_PATH="/path/to/kokkos;/path/to/kokkos-kernels;/path/to/pybind11"
-cmake --build build-cuda -j
+cmake --build build-cuda --parallel 4
 ctest --test-dir build-cuda --output-on-failure
 ```
 
@@ -91,9 +134,10 @@ HIP:
 ```bash
 cmake -S . -B build-hip -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
-  -DFQO_GPU_BACKEND=HIP \
+  -DCMAKE_CXX_COMPILER=hipcc \
+  -DFQO_GPU_BACKEND=HIP -DFQO_ENABLE_MPI=ON -DFQO_ENABLE_PYTHON=ON \
   -DCMAKE_PREFIX_PATH="/path/to/kokkos;/path/to/kokkos-kernels;/path/to/pybind11"
-cmake --build build-hip -j
+cmake --build build-hip --parallel 4
 ctest --test-dir build-hip --output-on-failure
 ```
 
