@@ -1,63 +1,66 @@
 # Tested configurations
 
-Tests were run on 20 September 2026, with job records checked on 24 September.
-They cover the developing 0.3 interface. The earlier LUMI-G research runs are
-listed separately below.
+Exa-Zellij has been tested on CPU, with MPI, and on NVIDIA and AMD GPUs.
+The table below gives the configurations and what ran on each device.
+The CPU, interface and one-node JUPITER tests were run in September 2026;
+the JUPITER checkpoint and restart tests were run on 24 October.
 
-| Configuration | Result |
-| --- | --- |
-| Linux x86-64 / WSL, GCC 11.4, Kokkos 4.5.01 and Eigen, without MPI or embedded Python | Build, CPU solver tests and Python API tests passed |
-| CPU Python wheel, Linux x86-64 / Python 3.12 | Built and installed; nine API tests, the FBD/FBO example, JSON CLI and `doctor` passed |
-| CPU with Open MPI 5.0.6, Python 3.12 and pybind11 3.0.1 | Five CTest groups passed, including two-process runs of both families with analytic and Python objectives |
-| JUPITER ARM CPUs and NVIDIA GH200 GPUs, CUDA 13, Kokkos 4.7.03 / Kernels 4.7.01 and ParaStationMPI 5.13.0-1-mt | Four-process runs of both families passed with analytic and embedded Python objectives; all four returned point/value checks passed |
-| AMD HIP / LUMI-G | Earlier research runs are available in the [LUMI-G results](../reproducibility/lumi_g/README.md); the developing 0.3 interface has not been rerun on AMD |
-| AMD HIP / Grid'5000 MI210 | Job 334968 stopped during setup on 21 September 2026, before building or running the tests |
-| Restart with a different number of MPI processes | Implemented through `--ft-elastic-resume`; a runtime test report for this version has not been added |
-
-Windows users run the software through WSL. Native Windows builds are not supported.
+| Configuration | What was tested | Result and record |
+| --- | --- | --- |
+| Linux x86-64 / WSL, GCC 11.4, Kokkos 4.5.01 and Eigen | CPU build, both optimizer families and Python objective interfaces | CPU solver and API tests passed; details below |
+| Linux x86-64, Python 3.12 wheel | Installation, Python API, JSON CLI and first-run example | Nine API tests, the FBD/FBO example and `doctor` passed |
+| Open MPI 5.0.6, Python 3.12 and pybind11 3.0.1 | Two-process FBD/FBO runs with analytic and embedded Python objectives | Five CTest groups passed; [MPI tests](../tests/test_mpi.py) |
+| JUPITER, four GH200 GPUs on one Booster node | Four MPI processes; optimizer and native analytic objective on GPUs; separate NumPy objective on CPU | Both families passed all four returned point/value checks; [job script](../scripts/jupiter/smoke.sbatch) |
+| JUPITER, 1, 2, 10, 25 and 50 Booster nodes | MPI/CUDA checkpoint and recovery for both families, up to 200 processes | Passed; [restart results](validation/jupiter-restart.md) |
+| JUPITER, 25 and 50 Booster nodes | Restart from 100 to 200 MPI processes and from 200 to 100 | Both families passed with three seeds; [restart results](validation/jupiter-restart.md) |
+| LUMI-G, AMD MI250X, eight MPI processes per node | Earlier VQE runs up to 1,000 nodes and 8,000 processes; optimizer through Kokkos/HIP and objective through PennyLane/JAX on GPUs | [Configuration](lumi-g.md), [results and available logs](../reproducibility/lumi_g/README.md) |
+| Grid'5000, AMD MI210 | HIP build and runtime test attempt | Job 334968 stopped during setup before compilation; no successful MI210 test is recorded here |
 
 ## CPU and objective interfaces
 
 The tests cover FBD and FBO callbacks, all six FBD geometries, and the PCA-GP,
-IDW, RBF and no-surrogate FBO options. They compare scalar and batched
+IDW, RBF and no-surrogate FBO options. They compare scalar and batch
 evaluations, run external executable objectives, and check invalid settings,
 nonfinite values, callback exceptions and unknown objective names.
 
-The native and MPI tests recompute the objective at the returned solution.
-They include FBD's off-centre probes and Python batches with strided float32
-output. The FBO tests run the search after its initial design of experiments.
-FBD's settings determine its evaluation count. The user-specified evaluation
-cap is enforced by the FBO Python interface.
+The native and MPI tests evaluate the objective again at the returned
+solution to check that its coordinates and value agree. They include FBD
+exploration points away from fractal centres and Python batches with
+strided float32 output. FBO tests include search after the initial design
+and check the evaluation limit in the Python interface.
 
-## JUPITER
+See the [API tests](../tests/test_api.py) and [MPI tests](../tests/test_mpi.py).
+Windows users run this installation through WSL.
 
-The two one-node jobs took 81 and 116 seconds, including startup and cleanup.
-Optimizer times are stored separately in their JSON results. Each run used
-four MPI processes, one per GPU. Native analytic objectives and optimizer
-kernels ran on the GPUs. The embedded Python test used NumPy on the CPU.
+## JUPITER GPU and restart tests
 
-The Python bridge used Python 3.13.5, NumPy 2.3.2 and pybind11 3.0.1.
-Automatic configuration detected the site's CUDA Kokkos installation and compiler.
-The [MPI test](../tests/test_mpi.py) and
-[JUPITER job script](../scripts/jupiter/smoke.sbatch) contain the test settings.
+The one-node tests used CUDA 13, Kokkos 4.7.03, Kokkos Kernels 4.7.01 and
+ParaStationMPI 5.13.0-1-mt. There was one MPI process per GPU. The embedded
+Python test used Python 3.13.5, NumPy 2.3.2 and pybind11 3.0.1. This NumPy
+objective ran on CPU; native analytic objectives ran on GPU.
 
-## Grid'5000 AMD attempt
+The October tests used the source at commit `a975949`. They cover process
+loss, damaged files, backup recovery and restart with a different number
+of MPI processes. A separate node-aggregation version also passed these
+checks. The [restart report](validation/jupiter-restart.md) identifies the
+two versions and gives their results.
 
-The Larochette job ran from 00:35:47 to 00:35:49 CEST and returned exit code 1.
-Its error output reports a missing user `.bashrc`. It stopped before producing
-build or test logs, so the HIP build and execution still need to be tested.
-The launch instructions are in [grid5000-hip.md](grid5000-hip.md).
+## AMD GPUs
 
-## Earlier results and remaining tests
+The LUMI-G records document HIP execution of the earlier VQE implementation.
+They include both optimizer kernels and GPU simulation of the objective.
+The [LUMI-G results](../reproducibility/lumi_g/README.md) identify which
+measurements have detailed logs and which have only scheduler records.
 
-The saved research results pass the result verifier. These checks recompute
-values from the existing files; they do not rerun the optimizations. The
-developing interface changes external FBD scoring, MPI best-solution
-coordinates and VQE error handling, which can affect comparisons with older
-runs. CPU and GPU results are compared numerically; their search paths need
-not be identical bit for bit.
+The separate MI210 attempt on Grid'5000 stopped because the job could not
+find the user's `.bashrc`. It produced no build or test results. The
+[Grid'5000 guide](grid5000-hip.md) gives the script for that test.
 
-The PennyLane/JAX simulator has not been rerun for this interface, and the
-NumPy bridge test does not exercise it or a physical QPU. AMD execution and
-distributable Linux wheels remain to be validated before release. CI targets
-Linux and does not require a native Windows build.
+## Configurations still needing tests
+
+The September Python interface has not been rerun with the PennyLane/JAX
+VQE environment. The embedded NumPy tests cover the Python connection,
+not the VQE simulator or a physical QPU. Additional Linux wheels also need
+testing before distribution. Native Windows builds are not supported.
+Intel GPU execution through Kokkos/SYCL needs application-side
+linear-algebra support and runtime tests.

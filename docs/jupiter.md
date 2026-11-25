@@ -10,15 +10,15 @@ sbatch --account=YOUR_ACCOUNT scripts/jupiter/smoke.sbatch
 
 Submit from the repository directory. The smoke job requests one node for at
 most three minutes and runs both families with four MPI ranks, one per GPU.
-FBD work is determined by its configuration. FBO receives a budget of 80.
-The native command also requires the budget argument for FBD, but FBD
-determines its evaluation count from its settings.
+FBO receives a budget of 80 evaluations. FBD uses its depth, beam and search
+settings to determine its work; it ignores the required budget argument.
 
 The recipe uses Stages/2026, GCC/14.3.0, Kokkos/4.7.03-CUDA-13,
 ParaStationMPI/5.13.0-1-mt and CMake/3.31.8, plus fetched Kokkos Kernels 4.7.01.
 It uses the site's `nvcc_wrapper` and MPI libraries. Recheck module availability
 when the site changes stages. MPI modules are loaded inside the batch script.
-The typed GH200 resource request avoids mixing typed and untyped GPU options.
+Use the `gh200` GPU type consistently in Slurm resource options; mixing typed
+and untyped GPU requests causes an allocation error.
 
 The default build supports native analytic functions and external executable
 objectives. To add embedded Python objectives, use the site's Python 3.13.5
@@ -43,6 +43,10 @@ python3 configure.py --mpi --kernels-tag 4.7.01 --build
 An existing Kokkos installation provides its compiled target architecture.
 When building Kokkos from source for GH200 on a login node without a GPU, use
 `--backend cuda --arch HOPPER90`. Run GPU executables only inside allocations.
+
+Checkpoint and restart tests also passed with up to 200 MPI processes. See
+the [JUPITER restart report](validation/jupiter-restart.md) for the process
+counts, checks and saved results.
 
 Site references: [JUPITER documentation](https://apps.fz-juelich.de/jsc/hps/jupiter/)
 and [Kokkos build configuration](https://kokkos.org/kokkos-core-wiki/get-started/configuration-guide.html).

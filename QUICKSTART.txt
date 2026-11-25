@@ -1,8 +1,8 @@
-FRACTAL-BASED OPTIMIZERS — QUICK START
+EXA-ZELLIJ — QUICK START
 ====================================
 
 Run these commands from the repository folder containing pyproject.toml.
-This guide describes the developing 0.3 interface, not the older public tag.
+These instructions install the source version in this checkout.
 The Python import and command remain fqo. VQE is an optional objective addon.
 For an existing installation under the old distribution name, see the upgrade
 instructions in docs/user-guide.md before installing the renamed package.
@@ -10,7 +10,7 @@ instructions in docs/user-guide.md before installing the renamed package.
 1. INSTALL ON LINUX OR WSL (CPU)
 
 Linux is the supported operating system. On Windows, open Ubuntu/WSL and run
-the Linux commands there. Native Windows installation is outside the scope.
+the Linux commands there. Native Windows builds are not supported.
 You need Python 3.10+, Git and a C++20 compiler such as GCC 11 or newer.
 The first installation compiles the optimizer and downloads missing build
 dependencies, so allow several minutes. GPU/MPI/VQE packages are optional.
@@ -56,7 +56,7 @@ Lower objective values are better. Return one finite number per call.
 For FBD, replace the Config(...) above with:
     Config(family="fbd", max_depth=3, beam=4)
 
-FBD has NO evaluation-budget parameter: its configuration determines its work.
+FBD has no evaluation-budget parameter: its configuration determines its work.
 FBO takes a maximum number of objective evaluations and may finish earlier.
 The Python interface normalizes bounds internally; your function and the result
 use your original units. See docs/user-guide.md for initial-design defaults.

@@ -12,7 +12,7 @@ at the same time and save their results in separate files.
   PennyLane-Lightning, PySCF, and h5py;
 - this repository visible from the allocated node.
 
-Set the portable paths before submission:
+Set the paths for your installation before submission:
 
 ```bash
 export PROJECT_ROOT="$HOME/fractal-quantum-optimizer"
@@ -31,8 +31,8 @@ Edit the OAR resource header and desired `MOLECULES_LIST`/`SEED_ORDER`, then:
 oarsub -S reproducibility/grid5000/oar/grid5000_vqe_equal_count_one_node_nantes.oar.sh
 ```
 
-The six methods run in groups according to the number of available GPUs.  Completed conditions
-are detected through `RUN_SUCCESS`; a later reservation can reuse the same
+The six methods run in groups according to the number of available GPUs.  Completed runs
+are recorded with `RUN_SUCCESS`; a later reservation can reuse the same
 `RESULT_ROOT` and resume rather than repeat them.
 
 ## Knowledge-driven experiment
@@ -50,12 +50,12 @@ plus auxiliary metric circuits.
 
 ## Robustness experiment
 
-The stage/worker pair preserves the 13-configuration, three-molecule,
-five-seed protocol.  It is normally called from a two-node OAR wrapper after
-both nodes have been staged.  The complete protocol and analyzer are in
-`code/`; the retained measurements are in `../local/results/robustness/`.
+The robustness test uses 13 configurations, three molecules and five seeds.
+Its scripts prepare both nodes, then launch the workers from a two-node OAR
+job. The test settings and analysis scripts are in `code/`; the saved
+measurements are in `../local/results/robustness/`.
 
-## 30-qubit evaluator preflight
+## 30-qubit evaluator test
 
 `grid5000_vqe_30q_preflight_nantes.oar.sh` tests the molecular evaluator
 on a 30-qubit LiH/cc-pVDZ active space and saves progress during execution.

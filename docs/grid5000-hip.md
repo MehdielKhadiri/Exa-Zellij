@@ -23,5 +23,5 @@ executable, an exit code and (on success) `PASS.txt` are saved under
 the tests completed.
 
 Job 334968 stopped during setup on 21 September 2026 because the user's
-`.bashrc` was missing. It did not reach the build or tests. The HIP tests
-therefore still need to be run; see the [test report](validation.md).
+`.bashrc` was missing. It did not reach the build or tests. The available record therefore does not confirm an MI210 test pass. The
+[test report](validation.md) also links the completed HIP runs on LUMI-G.

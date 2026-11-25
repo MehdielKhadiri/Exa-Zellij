@@ -1,15 +1,15 @@
-# Fractal-Based Optimizers: installation and use
+# Exa-Zellij: installation and use
 
-This is the developing 0.3 interface. Platform validation is recorded separately
-in `docs/validation.md`; a build recipe is not a promise that every platform has
-been tested. The research data and previous launch commands remain available.
+Use this guide to install Exa-Zellij, supply your objective function and choose
+an optimizer. Start with the CPU installation, then add MPI or GPU support
+when needed. The [test report](validation.md) lists the tested configurations.
 
 ## Install on Linux or WSL
 
 The source distribution is named `fractal-based-optimizers`. The Python module
-and command remain `fqo`; this rename does not change objective or component
-APIs. Installation below is from this checkout, not a claim that this development
-version has been published to PyPI. The GitHub repository URL retains its old name.
+and command are `fqo`. Install from a checkout of the
+[Exa-Zellij repository](https://github.com/MehdielKhadiri/Exa-Zellij) using the
+commands below.
 
 When upgrading an environment containing the old distribution, remove it first
 because both distributions install the same `fqo` module:
@@ -22,7 +22,7 @@ python -m pip install .
 Skip the uninstall for a new environment. Existing scripts keep their imports.
 
 Linux is the supported operating system. On a Windows PC, run the commands
-inside Ubuntu/WSL; native Windows is outside the supported scope.
+inside Ubuntu/WSL. Native Windows builds are not supported.
 Install Python 3.10+, Git and a C++20 compiler such as GCC 11+.
 From the repository:
 
@@ -37,8 +37,7 @@ python examples/python_quickstart.py
 The source install builds the native CPU optimizer and fetches pinned missing
 C++ dependencies. No GPU, MPI, NumPy, quantum package or Python development
 library is required for the default core. This can take several minutes.
-Ready-made platform wheels would remove the compiler requirement; they must be
-built, tested and published before advertising a compiler-free public install.
+Keep a C++ compiler available when installing from source.
 
 ## Supply an objective and choose the family
 
@@ -60,21 +59,21 @@ print(fbd.x, fbd.fun, fbd.nfev, fbd.status)
 ```
 
 FBO accepts an evaluation budget; the Python interface caps actual objective
-calls, including initial/probe evaluations. `evaluation_limit` means it stopped
-at this cap and returned the best evaluated point. FBD has no evaluation-budget
+calls, including the initial design and points evaluated during exploration.
+`evaluation_limit` means it stopped at this cap and returned the best evaluated point. FBD has no evaluation-budget
 parameter: depth, beam, geometry and exploration determine its work. Both
 families count actual evaluations, including duplicate points. Early completion
 is possible. `fun` is the best value actually observed from your callback.
 
-The API uses the compiled algorithm, with affine normalization of each bound
-interval to [0,1]. Callbacks and returned points use the original coordinates.
-This normalization affects distance-based search compared with an unnormalized
-native run, and is part of the Python API's documented behavior. The default
-FBO DOE is Halton so a first run needs no external design file. Other component
+The Python API runs the compiled optimizer. Internally, it maps each coordinate
+to [0,1]; your function and the returned solution use the original coordinates.
+This changes distances within the search compared with a native run that uses
+the original bounds. The default design of experiments for FBO uses Halton so a first run needs no external design file. Other component
 defaults remain those of the native implementation. Its initial design uses
 one quarter of the requested budget (at least two points for GP surrogates),
-leaving evaluations for search. Override it with `Config(n_init=...)`. This
-avoids the legacy CLI's fixed 100-point initial design exhausting small budgets.
+leaving evaluations for search. Override it with `Config(n_init=...)`.
+For a native CLI run with a small budget, also set `--n-init`: its default
+initial design has 100 points.
 
 Callbacks receive a list and return one finite number. Optionally pass
 `batch_objective=...` accepting a list of rows and returning one value per row.
@@ -96,7 +95,7 @@ The child reads `{"x":[0.1,0.2]}` from stdin and writes one JSON number to stdou
 Diagnostics go to stderr. Arguments are passed without a shell. A fresh process
 per evaluation is convenient for expensive simulations; use a persistent or
 batched callable for cheap objectives. External software still needs its own
-runtime and a wrapper matching this contract.
+runtime and a wrapper that reads and writes this format.
 
 ## Run from an editable JSON configuration
 
@@ -128,10 +127,10 @@ existing Kokkos configuration, select the intended backend explicitly. Kokkos
 detects the device architecture where supported; `--arch` overrides it when
 building Kokkos. An already installed Kokkos retains its compiled architectures.
 Use `--prefix` for dependencies, `--cxx` for a custom compiler, and a fresh
-`--build-dir` when changing toolchains. The default Python wheel intentionally
-targets CPU for portability; CUDA/HIP installations use a site/device build.
-CPU, NVIDIA CUDA and AMD HIP are the implemented math backends. Other Kokkos
-backends need solver adapters and tests before they can be advertised.
+`--build-dir` when changing toolchains. The default Python wheel
+runs on CPU; CUDA/HIP installations use a site/device build.
+The supported backends are CPU, NVIDIA CUDA and AMD HIP. Intel GPU execution
+through SYCL still needs linear-algebra support in this application and tests.
 
 ```sh
 cmake -S . -B build-cpu -DFQO_GPU_BACKEND=CPU -DCMAKE_BUILD_TYPE=Release
@@ -140,7 +139,7 @@ ctest --test-dir build-cpu --output-on-failure
 cmake --install build-cpu --prefix /your/install/prefix
 ```
 
-Use `-DFQO_ENABLE_MPI=ON` for a real MPI build, `-DFQO_GPU_BACKEND=CUDA|HIP`
+Use `-DFQO_ENABLE_MPI=ON` for an MPI build, `-DFQO_GPU_BACKEND=CUDA|HIP`
 for accelerators, and `-DFQO_ENABLE_PYTHON=ON` for embedded objective modules.
 The compiler must match the Kokkos installation. Supply dependency prefixes via
 `CMAKE_PREFIX_PATH`; `-DFQO_FETCH_DEPS=OFF` prohibits dependency downloads.
@@ -148,7 +147,7 @@ For offline builds, preinstall dependencies or provide CMake FetchContent source
 directories. Build in a fresh directory when changing backend/compiler.
 
 Use site-native MPI and GPU libraries on HPC. The PC wheel is single-process;
-it deliberately rejects accidental multi-rank launches. Set `FQO_EXECUTABLE` to
+it rejects launches with multiple MPI processes. Set `FQO_EXECUTABLE` to
 a custom build when using the Python driver. Pipe callbacks are single-rank;
 distributed objectives use the embedded module adapter below.
 
@@ -178,8 +177,7 @@ Callbacks must be safe to evaluate independently on each MPI rank.
 
 ## VQE add-on and new components
 
-VQE remains an optional objective. Its existing module and reproducibility
-environments are retained. Install `.[vqe]` for the recorded simulator dependency
+VQE is an optional objective for molecular-energy optimization. Install `.[vqe]` for the recorded simulator dependency
 versions, also listed in `requirements-vqe.txt`. This chemistry stack requires
 a platform supported by PySCF; use Linux/WSL for it on a Windows PC. Open-shell
 molecules additionally require the OpenFermion/PySCF adapter used by the
@@ -197,5 +195,4 @@ See `docs/quantum-interface.md` for simulator and dataset setup.
 Custom objective adapters require no optimizer rebuild. New device surrogates
 currently do: add the kind/parser in `FBOTypes.hpp`/`FBOConfig.cpp`, implement
 training/prediction in `FBOSurrogateModels.*` or `GPfunctions.*`, and connect it
-in `main.cpp`. Add numerical and optimization tests. This is a documented source
-extension point, not yet a stable runtime surrogate plugin API.
+in `main.cpp`. Check the new component with numerical and optimization tests.

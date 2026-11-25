@@ -46,8 +46,8 @@ reproducibility/
 
 ### Grid'5000 black-box equal-call comparison
 
-`grid5000/results/black_box_equal_call/runs_long.csv` is the retained run-level
-measurement table.  It contains objective-call checkpoints, energies, FCI
+`grid5000/results/black_box_equal_call/runs_long.csv` is the table of individual
+measurements.  It contains objective-call checkpoints, energies, FCI
 references, absolute errors, and wall times.  The reported comparison uses the
 median stochastic-baseline error with deterministic PFDA-BS at the final
 matched checkpoint.  The verifier reproduces 25 wins, 14 ties, and one loss at a
@@ -59,14 +59,13 @@ hostnames. Personal filesystem paths have been replaced.
 ### Grid'5000 knowledge-driven comparison
 
 `grid5000/results/knowledge_driven/matched_quantum_work_curves.csv` and
-`quantum_aware_summary.csv` are the retained aggregate outputs.  The complete
+`quantum_aware_summary.csv` contain the summary results.  The complete
 eight-molecule result table is in `paper_final_errors.csv`; the verifier checks
-all retained unrounded conditions against that table and reproduces
+all available unrounded results against that table and reproduces
 8 wins, 15 ties, and one loss.
 
 The archived experiment data do not include the individual H5/LiH
-quantum-aware run logs. Those two rows are therefore identified as reported
-aggregate values rather than raw-log values. Rerun support remains present in `grid5000/code/` and
+quantum-aware run logs. Those two rows are therefore identified as summary values. The scripts for repeating these runs are in `grid5000/code/` and
 `grid5000/oar/`.
 
 ### Robustness experiment
@@ -81,16 +80,14 @@ so that the same resumable design can be reproduced on an Ecotaxe allocation.
 
 The LUMI-G job scripts are in `scripts/lumi/`. The result tables are in
 `lumi_g/results/`, where the verifier checks their numerical consistency.
-`lumi_g/raw_evidence/` records source-file hashes and verbatim result-bearing
-excerpts from the archived execution records. It directly supports five of
+`lumi_g/raw_evidence/` records source-file hashes and verbatim lines reporting results from the archived execution records. It directly supports five of
 the eight scaling timestamps and seven of the nine solution-quality energies,
 and includes scheduler completion records for the 8,000-rank endpoint and the
 HF, OH-, and LiH quality runs.
 
-Detailed source traces are not available for every reported coordinate. The
-evidence index therefore records only archived source evidence and labels each
-entry as `exact`, `energy_only`, or `scheduler_only`. The remaining coordinates
-are retained in the result tables and documented explicitly in
+Detailed source traces are not available for every reported result. The log index labels each entry as `exact`, `energy_only`, or
+`scheduler_only`, according to the information available. The remaining
+results are listed in the tables and described in
 `lumi_g/README.md`.
 
 ## Running the experiments again

@@ -1,7 +1,6 @@
 # Runtime configuration
 
-The executable prints the selected family and every effective component at
-startup. Options are case-insensitive.
+At startup, the executable prints the family and components it will use. Options are case-insensitive.
 
 ## Common arguments
 
@@ -9,11 +8,11 @@ startup. Options are case-insensitive.
 fractal_optimizer <beam_cap> <dimension> <budget> <expense_factor> <objective>
 ```
 
-`beam_cap` limits the retained active set. `dimension` is ignored for VQE after
+`beam_cap` limits the number of active fractals. `dimension` is ignored for VQE after
 the Python evaluator reports the ansatz parameter count. `budget` is the global
-objective-evaluation budget for FBO; FBD ignores this legacy positional token
-and determines its work from its structural configuration. `expense_factor` repeats arithmetic only for the
-included analytic objectives. `objective` can also be supplied with
+objective-evaluation budget for FBO. FBD requires this argument but ignores
+its value: decomposition, depth, beam and search components determine its work.
+`expense_factor` repeats arithmetic for the included analytic objectives. `objective` can also be supplied with
 `--objective`.
 
 Common options:
@@ -51,7 +50,7 @@ Additional controls include `--fbd-points-per-cell`,
 
 ### Branching and beam width
 
-The current hypersphere generator creates `2*d` children per parent. Defaults
+Hypersphere decomposition creates `2*d` children per parent. Defaults
 for simplex-lite (`simplex`) and Voronoi-style (`voronoi`) are `d+1` and `2*d+1`.
 These two implementations use a center plus positive coordinate offsets or
 signed coordinate offsets, respectively; they are not arbitrary geometric
@@ -60,21 +59,21 @@ covered coordinate directions. Counts above those defaults repeat generated
 children rather than introducing new directions. Distinct children of one
 parent do not guarantee non-overlapping regions across parents.
 
-`--fbd-beam-width` caps retained cells; it does not set branching or guarantee
-a full beam at every level. Larger branching, beams, probe counts, and local
+`--fbd-beam-width` limits the number of active fractals; it does not set branching or guarantee
+a full beam at every level. More children, wider beams, more exploration points and longer
 exploitation increase work and can change solution quality. Report actual
 evaluations as well as runtime when comparing them.
 
 For MPI comparisons, explicitly select `--fbo-doe-distribution distributed`
 even with FBD if `--n-init` is intended as a global initial-design size. The
 default replicated mode performs the design on every rank and increases work
-with rank count. Record the actual counts to expose any remaining replicated
-per-rank work.
+with rank count. Check the reported evaluation counts when comparing runs with different
+numbers of processes.
 
 ## FBO components
 
-FBO exposes its design of experiments, decomposition, surrogate/acquisition
-model, budget distribution, and exploitation procedure:
+For FBO, choose the design of experiments, decomposition, surrogate, budget
+distribution and exploitation algorithm:
 
 | Component | Option | Values |
 |---|---|---|
@@ -87,7 +86,7 @@ model, budget distribution, and exploitation procedure:
 | Exploitation | `--fbo-exploitation` | `surrogate-local`, `random-local`, `random-restart`, `best-cell`, `none` |
 | Budget distribution | `--fbo-budget` | `astra`, `fixed-fractions` |
 
-ASTRA-style mechanisms can be toggled independently:
+The contraction and exploitation-guidance settings can be selected independently:
 
 - `--fbo-radius-mode fixed|adaptive`
 - `--fbo-exploitation-guidance fixed|adaptive`
@@ -100,7 +99,7 @@ Fixed-fraction budgeting uses `--doe-frac`, `--explore-frac`, and
 
 For a fresh CLI/MPI FBO run, the global cap counts actual evaluations across
 all ranks, including each rank's initial-center evaluation and any replicated
-DOE calls. Phase fractions are nominal allocations: exploration must fit the
+DOE calls. The phase fractions set the intended shares of this budget: exploration must fit the
 remainder after initialization, and exploitation is limited by the actual
 remaining budget. Local-search starts and coordinate proposals count toward
 that limit. A run may finish below its cap. If initialization leaves no search

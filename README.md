@@ -77,8 +77,10 @@ Kokkos targets NVIDIA CUDA or AMD HIP accelerators.
    CUDA/HIP builds support GPU execution and optional MPI distribution.
 5. Python and JSON interfaces expose bounds, family configuration, seeds,
    result coordinates, objective values, and evaluation counts.
-6. VQE is an optional objective adapter. Its simulator environments and
-   Grid'5000/LUMI reproducibility bundle are retained separately from core use.
+6. Checkpoints save search progress and allow restart with the same or a
+   different number of MPI processes. See the [restart tests](docs/validation/jupiter-restart.md).
+7. VQE is an optional objective for molecular-energy optimization. The
+   Grid'5000 and LUMI-G results include instructions for repeating the runs.
 
 The VQE backend simulates quantum circuits with PennyLane/JAX. To connect a
 physical QPU, an adapter can implement the same `init`, `eval` and `eval_batch`
@@ -97,7 +99,7 @@ functions described in the [quantum interface guide](docs/quantum-interface.md).
 ├── scripts/lumi/            LUMI-G build/run material
 ├── reproducibility/         Grid'5000/LUMI protocols, results, and verifier
 ├── docs/                    Configuration and hybrid-interface documentation
-└── tests/                   Dependency-light release integrity checks
+└── tests/                   CPU, Python API, MPI and release checks
 ```
 
 ## Check the published results
@@ -221,11 +223,11 @@ For LUMI-G, use [docs/lumi-g.md](docs/lumi-g.md) and
 
 ## Configuration
 
-The complete runtime component matrix is documented in
+The available components and their settings are listed in
 [docs/configuration.md](docs/configuration.md). Ready-to-edit examples are in
 [`examples/`](examples/).
 
-## Research status
+## Development and test results
 
 The software is under development, and its API may change. The repository
 includes the FBD/FBO implementation and the Grid'5000 and LUMI-G VQE results.

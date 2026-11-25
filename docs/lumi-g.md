@@ -7,7 +7,7 @@ on the GPUs inside the site ROCm container.
 ## 1. Clone and build
 
 For a core-only HIP build, after loading a compatible site ROCm/CMake/MPI
-environment, the new helper selects the backend/compiler before CMake starts:
+environment, the configuration helper selects the backend and compiler:
 
 ```bash
 python3 configure.py --backend hip --arch VEGA90A --mpi --build
@@ -19,8 +19,8 @@ An installed Kokkos retains its compiled target architecture. The helper uses
 `hipcc`; if the site's MPI setup requires its Cray wrapper, pass the configured
 wrapper with `--cxx`. See the site's
 [compiler instructions](https://docs.lumi-supercomputer.eu/development/compiling/prgenv/).
-The developing 0.3 interface has not yet been tested on AMD; see
-[the test report](validation.md).
+The saved LUMI-G results use the earlier VQE implementation. See the
+[test report](validation.md) for the tested versions and configurations.
 
 To use the build script from the earlier VQE experiments:
 
@@ -53,7 +53,7 @@ export VQE_OFFLINE=1
 export XDG_CACHE_HOME="$HOME/pl-data-cache"
 ```
 
-## 3. Edit only site/user placeholders
+## 3. Set your account and environment
 
 In `scripts/lumi/vqe_sweep.sbatch`:
 

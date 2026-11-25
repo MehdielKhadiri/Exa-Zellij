@@ -15,7 +15,7 @@ This directory contains the result tables and available execution logs:
 - `raw_evidence/raw_log_evidence.csv` indexes the corresponding archived
   execution records, including their original sizes and SHA-256 hashes.
 - `raw_evidence/log_excerpts.txt` retains the exact terminal lines needed to
-  connect those source logs to the published energies and timings.
+  identify the published energies and timings in those logs.
 
 `../verify_results.py` recomputes every speedup and efficiency, checks the
 eight-GPU-per-node mapping, confirms the 8,000-GPU/60.98% endpoint, and
