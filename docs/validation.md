@@ -14,7 +14,6 @@ the JUPITER checkpoint and restart tests were run on 24 October.
 | JUPITER, 1, 2, 10, 25 and 50 Booster nodes | MPI/CUDA checkpoint and recovery for both families, up to 200 processes | Passed; [restart results](validation/jupiter-restart.md) |
 | JUPITER, 25 and 50 Booster nodes | Restart from 100 to 200 MPI processes and from 200 to 100 | Both families passed with three seeds; [restart results](validation/jupiter-restart.md) |
 | LUMI-G, AMD MI250X, eight MPI processes per node | Earlier VQE runs up to 1,000 nodes and 8,000 processes; optimizer through Kokkos/HIP and objective through PennyLane/JAX on GPUs | [Configuration](lumi-g.md), [results and available logs](../reproducibility/lumi_g/README.md) |
-| Grid'5000, AMD MI210 | HIP build and runtime test attempt | Job 334968 stopped during setup before compilation; no successful MI210 test is recorded here |
 
 ## CPU and objective interfaces
 
@@ -51,10 +50,6 @@ The LUMI-G records document HIP execution of the earlier VQE implementation.
 They include both optimizer kernels and GPU simulation of the objective.
 The [LUMI-G results](../reproducibility/lumi_g/README.md) identify which
 measurements have detailed logs and which have only scheduler records.
-
-The separate MI210 attempt on Grid'5000 stopped because the job could not
-find the user's `.bashrc`. It produced no build or test results. The
-[Grid'5000 guide](grid5000-hip.md) gives the script for that test.
 
 ## Configurations still needing tests
 
