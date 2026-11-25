@@ -1,7 +1,7 @@
-# AMD verification on Grid'5000
+# AMD tests on Grid'5000
 
 Grid'5000's Larochette cluster in Luxembourg provides AMD MI210 GPUs (gfx90a).
-This gives another place to validate the HIP backend before deploying on LUMI.
+The job below builds the HIP backend and runs its tests on one node.
 See the [site hardware inventory](https://www.grid5000.fr/w/Luxembourg:Hardware).
 
 From the repository on the Luxembourg frontend:
@@ -19,10 +19,9 @@ updating as the site environment changes.
 Compilation runs on the allocated node in `/tmp`. The job then runs two-rank
 FBD/FBO analytic tests and the Python callback/component tests. Logs, the native
 executable, an exit code and (on success) `PASS.txt` are saved under
-`results/grid5000-hip-JOB_ID`. A submitted job or a successful compile alone is
-not a completed runtime validation; check `PASS.txt` and the test logs.
+`results/grid5000-hip-JOB_ID`. Check `PASS.txt` and the logs to confirm that
+the tests completed.
 
-The initial job, 334968, exited during setup on 2026-09-21 before building or
-running tests. Its stderr reports a missing user `.bashrc`; no `PASS.txt` was
-produced. The recipe is not yet a successful AMD validation. See
-[validation.md](validation.md) for the measured status.
+Job 334968 stopped during setup on 21 September 2026 because the user's
+`.bashrc` was missing. It did not reach the build or tests. The HIP tests
+therefore still need to be run; see the [test report](validation.md).

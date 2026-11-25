@@ -1,6 +1,7 @@
-# Fractal-Based Optimizers
+# Exa-Zellij
 
-A configurable optimization core in C++/Kokkos, with a Python interface, for:
+Exa-Zellij provides configurable fractal-based optimizers in C++ with Kokkos,
+MPI and a Python interface. It supports two algorithm families:
 
 - **Fractal-Based Decomposition (FBD)**, where decomposition, exploration,
   scoring, tree search, and exploitation are selected independently; and
@@ -8,25 +9,23 @@ A configurable optimization core in C++/Kokkos, with a Python interface, for:
   function guide the fractal search under a fixed objective-evaluation budget.
 
 Use your own objective function, select a family and its components, and run on
-Linux or WSL. MPI, NVIDIA CUDA, AMD HIP, and the VQE quantum-chemistry objective
-are optional. **Quantum simulation is an addon, not a requirement of either
-optimizer family.**
+Linux or WSL. You can add MPI for distributed runs, CUDA or HIP for GPUs,
+and a VQE objective for quantum-chemistry simulations.
 
-The project was previously called Fractal Quantum Optimizer. The source package
-is now named `fractal-based-optimizers`; existing `from fqo import ...`, the
-`fqo` command, `FQO_*` build options, and the `fractal_optimizer` executable
-remain compatible. The GitHub URL and historical release environments still
-use the old name. See the [installation guide](docs/user-guide.md) for upgrades.
+The Python package is named `fractal-based-optimizers`. Its imports use `fqo`,
+and the command-line tools are `fqo` and `fractal_optimizer`. CMake options
+keep the `FQO_*` prefix. Older releases and environments use the former name,
+Fractal Quantum Optimizer. See the [installation guide](docs/user-guide.md)
+for upgrades.
 
 ## Start on Linux or WSL
 
 Start with [QUICKSTART.txt](QUICKSTART.txt) for copy-and-paste installation and
 first-run instructions, or the [full guide](docs/user-guide.md) for more options.
 
-The supported operating system is Linux, including Ubuntu through WSL on a
-Windows PC. Native Windows is outside the supported scope. The developing 0.3
-interface runs on CPU without MPI or quantum dependencies. Source installation
-needs Python 3.10+, Git and a C++20 compiler such as GCC 11+.
+Use Linux, or Ubuntu through WSL on Windows. The developing 0.3 interface
+runs on CPU without MPI or quantum packages. Installing from source requires
+Python 3.10+, Git and a C++20 compiler such as GCC 11+.
 
 ```sh
 python -m pip install .
@@ -56,8 +55,8 @@ For accelerator builds, load your site's toolchain and run
 `python configure.py --build`. The helper detects an existing Kokkos backend,
 or CUDA/HIP compilers, with explicit target overrides for HPC login nodes.
 Use [JUPITER](docs/jupiter.md) or [LUMI-G](docs/lumi-g.md) instructions on those
-systems. See [validation status](docs/validation.md) before relying on a platform;
-source installation and tested/published binary wheels are distinct.
+systems. The [test report](docs/validation.md) lists the configurations that
+have been run and the Python wheel that has been tested.
 
 ## Optional VQE objective and research bundle
 
@@ -81,11 +80,9 @@ Kokkos targets NVIDIA CUDA or AMD HIP accelerators.
 6. VQE is an optional objective adapter. Its simulator environments and
    Grid'5000/LUMI reproducibility bundle are retained separately from core use.
 
-The present VQE backend is a PennyLane/JAX simulator path. It is a feasibility
-implementation for hybrid HPC–quantum workflows, not a claim that a GPU
-simulator is physical quantum hardware. A physical QPU adapter can implement
-the same `init`, `eval`, and `eval_batch` Python interface described in
-[docs/quantum-interface.md](docs/quantum-interface.md).
+The VQE backend simulates quantum circuits with PennyLane/JAX. To connect a
+physical QPU, an adapter can implement the same `init`, `eval` and `eval_batch`
+functions described in the [quantum interface guide](docs/quantum-interface.md).
 
 ## Repository map
 
@@ -103,10 +100,10 @@ the same `init`, `eval`, and `eval_batch` Python interface described in
 └── tests/                   Dependency-light release integrity checks
 ```
 
-## Verify the published result artifacts
+## Check the published results
 
-No accelerator or quantum dependencies are required to check the retained
-measurements and recompute the central paper-facing outcomes:
+The following command checks the saved results and recomputes the paper
+comparisons. It runs on CPU without quantum packages:
 
 ```bash
 python reproducibility/verify_results.py
@@ -114,8 +111,8 @@ python reproducibility/verify_results.py
 
 The verifier checks file hashes, reconstructs the equal-call and
 knowledge-driven win/tie/loss counts, validates all 195 robustness runs, and
-recomputes the LUMI-G scaling and solution-quality quantities.  Full provenance
-and rerun instructions are in
+recomputes the LUMI-G scaling and solution-quality results. The experiment
+records and instructions for repeating the runs are in
 [`reproducibility/README.md`](reproducibility/README.md).
 
 ## Advanced GPU/HPC build
@@ -230,12 +227,11 @@ The complete runtime component matrix is documented in
 
 ## Research status
 
-This is a research release assembled from the implementation used for the
-configurable FBD/FBO and Grid'5000/LUMI-G VQE experiments. It favors traceable
-runtime configuration and reproducible launch material over a stable library
-API.  Result files are labeled by provenance: retained run-level output,
-hash-indexed execution evidence, aggregate output, or reported coordinates for
-which a detailed source trace is not present in the archived experiment data.
+The software is under development, and its API may change. The repository
+includes the FBD/FBO implementation and the Grid'5000 and LUMI-G VQE results.
+The experiment folders contain result tables, available execution logs and
+instructions for repeating the runs. Their README files identify which
+results have detailed logs and which are available only in the tables.
 
 ## License
 

@@ -1,8 +1,8 @@
 # LUMI-G workflow
 
-The included path follows the environment used for the existing LUMI-G
-experiments: one MPI process per MI250X GCD, Kokkos/HIP for optimizer kernels,
-and a PennyLane/JAX evaluator inside the site ROCm container.
+The LUMI-G experiments use one MPI process per MI250X GPU die. Kokkos/HIP
+runs the optimizer kernels, and PennyLane/JAX evaluates the VQE objective
+on the GPUs inside the site ROCm container.
 
 ## 1. Clone and build
 
@@ -19,9 +19,10 @@ An installed Kokkos retains its compiled target architecture. The helper uses
 `hipcc`; if the site's MPI setup requires its Cray wrapper, pass the configured
 wrapper with `--cxx`. See the site's
 [compiler instructions](https://docs.lumi-supercomputer.eu/development/compiling/prgenv/).
-The developing 0.3 revision still needs an AMD runtime validation.
+The developing 0.3 interface has not yet been tested on AMD; see
+[the test report](validation.md).
 
-The earlier VQE/container experiment recipe remains available below:
+To use the build script from the earlier VQE experiments:
 
 ```bash
 git clone <repository-url> fractal-quantum-optimizer
@@ -60,9 +61,6 @@ In `scripts/lumi/vqe_sweep.sbatch`:
 - set the default `VENV` project path;
 - verify the site container path in `SIF`.
 
-No allocation identifier, user name, credential, or absolute home path is
-embedded in the repository.
-
 ## 4. Submit
 
 ```bash
@@ -87,7 +85,7 @@ Each run writes a full log and one row in
 the documented CPU masks. FBD/FBO distribute fractal work across MPI ranks;
 each rank evaluates its local batch through the selected PennyLane/JAX device.
 
-## Reproducibility notes
+## Recording a run
 
 - Record the repository commit, container path/digest, loaded modules, venv
   package list, Slurm job ID, and `results.csv`.

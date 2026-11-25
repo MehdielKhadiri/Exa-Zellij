@@ -1,8 +1,8 @@
 # Grid'5000 reproduction
 
-The launch material targets an NVIDIA A100 node on the Nantes Ecotaxe cluster.
-Each worker owns one GPU and one sequential optimizer run; independent methods
-or conditions execute concurrently without sharing result files.
+The job scripts target an NVIDIA A100 node on the Nantes Ecotaxe cluster.
+Each worker runs one optimizer on one GPU. Independent runs can execute
+at the same time and save their results in separate files.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ Edit the OAR resource header and desired `MOLECULES_LIST`/`SEED_ORDER`, then:
 oarsub -S reproducibility/grid5000/oar/grid5000_vqe_equal_count_one_node_nantes.oar.sh
 ```
 
-The six methods are mapped onto successive GPU waves.  Completed conditions
+The six methods run in groups according to the number of available GPUs.  Completed conditions
 are detected through `RUN_SUCCESS`; a later reservation can reuse the same
 `RESULT_ROOT` and resume rather than repeat them.
 
@@ -57,11 +57,10 @@ both nodes have been staged.  The complete protocol and analyzer are in
 
 ## 30-qubit evaluator preflight
 
-`grid5000_vqe_30q_preflight_nantes.oar.sh` is a checkpointed evaluator-only
-diagnostic for a 30-qubit LiH/cc-pVDZ active space.  It is not a complete
-PFDA-BS optimization and is not used by `verify_results.py` as a paper result.
-It is included to make the large-statevector feasibility path inspectable and
-rerunnable.
+`grid5000_vqe_30q_preflight_nantes.oar.sh` tests the molecular evaluator
+on a 30-qubit LiH/cc-pVDZ active space and saves progress during execution.
+It evaluates the objective without running PFDA-BS. Its results are separate
+from the paper comparisons checked by `verify_results.py`.
 
 ## Portable overrides
 

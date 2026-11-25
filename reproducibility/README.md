@@ -1,13 +1,13 @@
 # Reproducibility bundle
 
-This directory connects the public implementation to the experiments reported
-for the PFDA-BS VQE study.  It supports two different verification levels:
+This directory contains the PFDA-BS VQE results and the scripts used for the
+experiments. You can check the saved results or repeat the experiments:
 
-1. **Artifact verification** recomputes the reported comparison counts,
-   robustness statements, LUMI-G speedups, efficiencies, and energy errors
-   from the included CSV/JSON files without using an accelerator.
-2. **Experimental reproduction** reruns the objective evaluations with the
-   included Python drivers and Grid'5000 OAR or LUMI-G SLURM launch material.
+1. **Check the saved results:** recompute comparisons, robustness results,
+   LUMI-G speedups, efficiencies and energy errors from the CSV/JSON files.
+   This works on CPU.
+2. **Repeat the experiments:** run the Python drivers through the Grid'5000
+   OAR or LUMI-G Slurm job scripts.
 
 Run the dependency-free verification from the repository root:
 
@@ -18,7 +18,7 @@ python reproducibility/verify_results.py
 The command validates checksums and should end with
 `reproducibility verification: OK`.
 
-For a curated archive containing only Grid'5000 and LUMI-G evidence, use:
+To check only the Grid'5000 and LUMI-G results, use:
 
 ```bash
 python reproducibility/verify_results.py --scopes grid5000,lumi_g
@@ -42,7 +42,7 @@ reproducibility/
     └── results/      Published scaling and solution-quality coordinates
 ```
 
-## Evidence and provenance
+## Results and execution records
 
 ### Grid'5000 black-box equal-call comparison
 
@@ -53,9 +53,8 @@ median stochastic-baseline error with deterministic PFDA-BS at the final
 matched checkpoint.  The verifier reproduces 25 wins, 14 ties, and one loss at a
 `1e-7` Ha tie tolerance.
 
-The original execution manifests are included after replacing only personal
-filesystem locations.  Grid'5000 job identifiers and Ecotaxe hostnames are
-retained because they are useful provenance, not credentials.
+The execution records keep the Grid'5000 job identifiers and Ecotaxe
+hostnames. Personal filesystem paths have been replaced.
 
 ### Grid'5000 knowledge-driven comparison
 
@@ -72,17 +71,16 @@ aggregate values rather than raw-log values. Rerun support remains present in `g
 
 ### Robustness experiment
 
-The sensitivity experiment was executed on one NVIDIA RTX 3050 Laptop GPU,
-not on Grid'5000.  Its truthful provenance is therefore under `local/`.
+The sensitivity experiment ran on one NVIDIA RTX 3050 Laptop GPU. Its
+results are stored under `local/`.
 `runs.csv` contains all 195 measurements; `paired_effects.csv` contains the 12
 one-factor perturbations.  The Grid'5000 robustness launcher is also included
 so that the same resumable design can be reproduced on an Ecotaxe allocation.
 
 ### LUMI-G experiments
 
-The LUMI-G scripts are provided under `scripts/lumi/`. Reported numerical
-coordinates are available as machine-readable CSV files under
-`lumi_g/results/` and are independently checked by the verifier.
+The LUMI-G job scripts are in `scripts/lumi/`. The result tables are in
+`lumi_g/results/`, where the verifier checks their numerical consistency.
 `lumi_g/raw_evidence/` records source-file hashes and verbatim result-bearing
 excerpts from the archived execution records. It directly supports five of
 the eight scaling timestamps and seven of the nine solution-quality energies,
@@ -95,15 +93,13 @@ entry as `exact`, `energy_only`, or `scheduler_only`. The remaining coordinates
 are retained in the result tables and documented explicitly in
 `lumi_g/README.md`.
 
-## Reproduction boundary
+## Running the experiments again
 
-The repository does not redistribute Grid'5000 or LUMI container images,
-PennyLane datasets, scheduler accounts, or site modules.  These are
-site-controlled dependencies.  Launchers accept `PROJECT_ROOT`, `IMAGE`, and
-`RESULT_ROOT` overrides and write resumable `RUN_SUCCESS` markers plus
-machine-readable summaries.  Personal keys, credentials, access tokens, and
-home-directory identities are not included.
+You need access to the site's container images, datasets and modules, and
+an account for submitting jobs. Set `PROJECT_ROOT`, `IMAGE` and `RESULT_ROOT`
+for your environment. The job scripts save result summaries and mark finished
+runs with `RUN_SUCCESS`, so later jobs can continue from the remaining work.
 
-The large per-evaluation traces are omitted from Git because the curated
-run-level CSVs contain every value needed to reconstruct the reported tables.
-Reruns generate the full traces in their chosen `RESULT_ROOT`.
+The repository keeps the CSV measurements needed to reproduce the paper
+tables. The larger per-evaluation logs are generated when you repeat the
+experiments and are saved under `RESULT_ROOT`.
